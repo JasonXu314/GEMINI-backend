@@ -516,7 +516,7 @@
     "@types/yargs" "^15.0.0"
     chalk "^4.0.0"
 
-"@nestjs/cli@^7.0.0":
+"@nestjs/cli@^7.4.1":
   version "7.4.1"
   resolved "https://registry.yarnpkg.com/@nestjs/cli/-/cli-7.4.1.tgz#8430b906a4fa903efac193d88e9c02150c7a6b3e"
   integrity sha512-90IWWqDIPX3M0vwkmnZ0Ct/EY2b75DYbsw2ZbVxaj57ASdbajhS7Pxhc7MC/L+07nBge+xMRHvQRoKdcfWHd0w==
