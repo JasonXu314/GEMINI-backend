@@ -1,0 +1,135 @@
+{
+  "asset": {
+    "generator": "BabylonJS",
+    "version": "2.0"
+  },
+  "buffers": [
+    {
+      "byteLength": 74400,
+      "uri": "scene.bin"
+    }
+  ],
+  "nodes": [
+    {
+      "name": "chromosome",
+      "mesh": 0,
+      "rotation": [
+        0,
+        1,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "default light",
+      "rotation": [
+        0,
+        1,
+        0,
+        0
+      ]
+    }
+  ],
+  "meshes": [
+    {
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1
+          },
+          "indices": 2,
+          "material": 0
+        }
+      ]
+    }
+  ],
+  "scenes": [
+    {
+      "nodes": [
+        0,
+        1
+      ]
+    }
+  ],
+  "scene": 0,
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 16380,
+      "name": "position - chromosome",
+      "byteStride": 12
+    },
+    {
+      "buffer": 0,
+      "byteLength": 16380,
+      "byteOffset": 16380,
+      "name": "normal - chromosome",
+      "byteStride": 12
+    },
+    {
+      "buffer": 0,
+      "byteLength": 10920,
+      "byteOffset": 32760,
+      "name": "uv - chromosome",
+      "byteStride": 8
+    },
+    {
+      "buffer": 0,
+      "byteLength": 30720,
+      "byteOffset": 43680,
+      "name": "Indices - chromosome"
+    }
+  ],
+  "accessors": [
+    {
+      "name": "position - chromosome",
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 1365,
+      "type": "VEC3",
+      "min": [
+        -662.681640625,
+        -0.2156444638967514,
+        -0.9890603423118591
+      ],
+      "max": [
+        0.9861544370651245,
+        949.703857421875,
+        372.4518737792969
+      ],
+      "byteOffset": 0
+    },
+    {
+      "name": "normal - chromosome",
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 1365,
+      "type": "VEC3",
+      "byteOffset": 0
+    },
+    {
+      "name": "indices - chromosome",
+      "bufferView": 3,
+      "componentType": 5125,
+      "count": 7680,
+      "type": "SCALAR",
+      "byteOffset": 0
+    }
+  ],
+  "materials": [
+    {
+      "name": "default material",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.5,
+          0.5,
+          0.5,
+          1
+        ],
+        "metallicFactor": 0,
+        "roughnessFactor": 0.3288090062081349
+      }
+    }
+  ]
+}
