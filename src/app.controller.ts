@@ -1,55 +1,75 @@
-import { Controller, Get, Header, Logger } from '@nestjs/common';
-import { MessageBody, OnGatewayInit, SubscribeMessage, WebSocketGateway } from '@nestjs/websockets';
-import { writeFileSync } from 'fs';
-import { resolve } from 'path';
-import { AppService } from './app.service';
+import { BadRequestException, Controller, Get, Logger, NotFoundException, Param, Post, Response, UploadedFiles, UseInterceptors } from '@nestjs/common';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { ServerResponse } from 'http';
+import { Readable } from 'stream';
+import { v4 as uuid } from 'uuid';
+import { FilesService } from './app.service';
+
+const allowedExtensions: string[] = ['gltf', 'bin', 'png'];
 
 @Controller()
-@WebSocketGateway()
-export class AppController implements OnGatewayInit {
+export class AppController {
 	private readonly logger = new Logger('App');
 
-	constructor(private readonly service: AppService) {}
+	constructor(private readonly filesService: FilesService) {}
 
-	@Get('/gltf/scene.gltf')
-	@Header('Content-Type', 'model/gltf+json')
-	getGltf(): any {
-		this.logger.log('Recieved GET for GLTF');
-		return JSON.parse(this.service.getGltf());
+	@Post('/wakeup')
+	wakeup() {}
+
+	@Post('/save')
+	@UseInterceptors(FileFieldsInterceptor([{ name: 'gltf' }, { name: 'bin' }, { name: 'texture' }]))
+	async saveModel(@UploadedFiles() files: SaveFilesPost): Promise<SaveFilesResponse> {
+		const gltf = files.gltf[0];
+		const bin = files.bin[0];
+		const texture = files.texture[0];
+		if (gltf.mimetype === 'model/gltf+json' && bin.mimetype === 'application/octet-stream') {
+			const id = uuid();
+			const gltfStream = Readable.from(gltf.buffer);
+			const binStream = Readable.from(bin.buffer);
+			const textureStream = Readable.from(texture.buffer);
+
+			return this.filesService.saveModel(id, gltf.originalname, texture.originalname, { gltf: gltfStream, bin: binStream, texture: textureStream });
+		} else {
+			throw new BadRequestException(
+				'Either your glTF file or bin file has an incorrect file format; glTF files must be of type model/gltf+json and bin files must be of type application/octet-stream'
+			);
+		}
 	}
 
-	// @Get('/gltf/scene.bin')
-	// @Header('Content-Type', 'application/octet-stream')
-	// getBin(): any {
-	// 	const bytes = this.service.getBin();
-
-	// 	if (!bytes) {
-	// 		throw new NotFoundException('No Bin recieved yet!');
-	// 	} else {
-	// 		// readFileSync(resolve(__dirname, '..', 'testing', 'scene.bin')).toString()
-
-	// 		let binary = '';
-	// 		const len = bytes.byteLength;
-	// 		for (let i = 0; i < len; i++) {
-	// 			binary += String.fromCharCode(bytes[i]);
-	// 		}
-	// 		this.logger.log(bytes.byteLength);
-	// 		this.logger.log(binary.length);
-	// 		return binary;
-	// 	}
-	// }
-
-	@SubscribeMessage('GLTF_EXPORT')
-	handleExport(@MessageBody() body: { data: any; bin: number[] }): void {
-		this.service.setGltf(JSON.stringify(body.data));
-		this.service.setBin(body.bin);
-		this.logger.log(body.bin.length);
-		writeFileSync(resolve(__dirname, '..', 'testing', 'scene.bin'), Buffer.from(Uint8Array.from(body.bin).buffer));
-		writeFileSync(resolve(__dirname, '..', 'static', 'gltf', 'scene.bin'), Buffer.from(Uint8Array.from(body.bin).buffer));
-		writeFileSync(resolve(__dirname, '..', 'testing', 'scene.gltf'), body.data);
+	@Get('/models/:id')
+	async getModel(@Param('id') id: string): Promise<ModelFile> {
+		const metadata = await this.filesService.getMetadataById(id);
+		if (!metadata) {
+			throw new NotFoundException(`Model with id ${id} does not exist`);
+		}
+		return metadata;
 	}
 
-	afterInit(): void {
-		this.logger.log('Gateway Initialized');
+	@Get('/:file')
+	async getFile(@Param('file') file: string, @Response() res: ServerResponse): Promise<void> {
+		this.logger.log(`Received request for file ${file}`);
+		const tokenizedFile = file.split('.');
+		const ext = tokenizedFile[tokenizedFile.length - 1];
+		if (!allowedExtensions.includes(ext)) {
+			res.writeHead(400, 'Only requests for gltf/bin files are allowed').end();
+			return;
+		}
+		const modelName = file
+			.split('.')
+			.slice(0, -1)
+			.join('.');
+		if (ext === 'png') {
+			res.setHeader('Content-Type', 'image/png');
+			res.setHeader('Content-Disposition', `attachment; filename="${file}"; filename*=utf-8"${file}`);
+			this.filesService.getFile(file).pipe(res);
+		} else {
+			const fileMetadata = await this.filesService.getMetadataByName(modelName);
+			if (!fileMetadata) {
+				throw new NotFoundException(`Model with name ${modelName} does not exist`);
+			}
+			res.setHeader('Content-Type', ext === 'gltf' ? 'model/gltf+json' : 'application/octet-stream');
+			res.setHeader('Content-Disposition', `attachment; filename="${file}"; filename*=utf-8"${file}`);
+			this.filesService.getFile(file).pipe(res);
+		}
 	}
 }
