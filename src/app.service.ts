@@ -18,6 +18,9 @@ export class FilesService {
 				this.mongoClient = client;
 				const audioDb = client.db('files');
 				this.gridFS = new GridFSBucket(audioDb);
+				process.on('SIGTERM', async () => {
+					await this.mongoClient.close();
+				});
 			});
 		}
 	}
