@@ -8,7 +8,6 @@
 	"scripts": {
 		"prebuild": "rimraf dist",
 		"build": "nest build",
-		"postbuild": "node postbuild.js",
 		"format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
 		"start": "nest start",
 		"dev": "nest start --watch",
