@@ -25,39 +25,44 @@ export class FilesService {
 		}
 	}
 
-	public async saveModel(id: string, name: string, textureName: string, model: Model): Promise<SaveFilesResponse> {
-		const gltfId = uuid(),
+	public async modelExists(name: string): Promise<boolean> {
+		return (await this.mongoClient.db('files').collection<ModelFile>('metadata').find({ name }).count()) > 0;
+	}
+
+	public async saveModel(name: string, model: Model, modelData: ModelData): Promise<SaveFilesResponse> {
+		const modelId = uuid(),
+			gltfId = uuid(),
 			binId = uuid(),
-			textureId = uuid();
-		const modelFile: ModelFile = { _id: id, gltf: gltfId, bin: binId, texture: textureId, name };
-		await this.mongoClient
-			.db('files')
-			.collection<ModelFile>('metadata')
-			.insertOne(modelFile);
+			structId = uuid(),
+			epiId = uuid(),
+			grefId = uuid(),
+			textureIds = new Array(model.textures.length).fill(null).map(() => uuid());
+		const modelFile: ModelFile = { _id: modelId, gltf: gltfId, bin: binId, textures: textureIds, name, modelData };
 		await this.saveFile(gltfId, `${name}.gltf`, model.gltf);
 		await this.saveFile(binId, `${name}.bin`, model.bin);
-		await this.saveFile(textureId, `${textureName}`, model.texture);
+		await Promise.all(model.textures.map((texture, i) => this.saveFile(textureIds[i], texture.name, texture.stream)));
+		await this.saveFile(structId, `${name}.struct`, model.structure);
+		await this.saveFile(epiId, `${name}.epi`, model.epiData);
+		await this.saveFile(grefId, `${name}.gref`, model.refGenes);
+		await this.mongoClient.db('files').collection<ModelFile>('metadata').insertOne(modelFile);
 
 		return {
 			gltf: gltfId,
 			bin: binId,
-			texture: textureId,
-			link: `http://localhost:3000/view/${id}`
+			structure: structId,
+			epiData: epiId,
+			refGenes: grefId,
+			textures: textureIds,
+			link: `http://localhost:3000/view/${modelId}`
 		};
 	}
 
 	public async getMetadataById(id: string): Promise<ModelFile | null> {
-		return this.mongoClient
-			.db('files')
-			.collection<ModelFile>('metadata')
-			.findOne({ _id: id });
+		return this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id: id });
 	}
 
 	public async getMetadataByName(name: string): Promise<ModelFile | null> {
-		return this.mongoClient
-			.db('files')
-			.collection<ModelFile>('metadata')
-			.findOne({ name });
+		return this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ name });
 	}
 
 	public async saveFile(id: string, name: string, data: Readable): Promise<void> {
