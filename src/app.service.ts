@@ -28,7 +28,6 @@ export class FilesService {
 
 	/**
 	 * Checks to see if a model with name ``name`` already exists or not
-	 * TODO: refactor to use id instead of model name
 	 * @param name model name
 	 * @returns whether the model is already in the db or not
 	 */
@@ -37,28 +36,36 @@ export class FilesService {
 	}
 
 	/**
+	 * Checks to see if a model with id ``_id`` already exists or not
+	 * @param _id model id
+	 * @returns whether the model is already in the db or not
+	 */
+	public async modelExistsId(_id: string): Promise<boolean> {
+		return (await this.mongoClient.db('files').collection<ModelFile>('metadata').find({ _id }).count()) > 0;
+	}
+
+	/**
 	 * Saves a model into the db
-	 * TODO: refactor ot use id instead of model name
 	 * @param name the model name
 	 * @param model the files to save as the model
 	 * @param modelData other model metadata to consider
 	 * @returns the response to the client
 	 */
 	public async saveModel(name: string, model: Model, modelData: ModelData): Promise<SaveFilesResponse> {
-		const modelId = uuid(),
+		const _id = uuid(),
 			gltfId = uuid(),
 			binId = uuid(),
 			structId = uuid(),
 			epiId = uuid(),
 			grefId = uuid(),
 			textureIds = new Array(model.textures.length).fill(null).map(() => uuid());
-		const modelFile: ModelFile = { _id: modelId, gltf: gltfId, bin: binId, textures: textureIds, name, modelData };
+		const modelFile: ModelFile = { _id, gltf: gltfId, bin: binId, textures: textureIds, name, modelData };
 		await this.saveFile(gltfId, `${name}.gltf`, model.gltf);
 		await this.saveFile(binId, `${name}.bin`, model.bin);
 		await Promise.all(model.textures.map((texture, i) => this.saveFile(textureIds[i], texture.name, texture.stream)));
-		await this.saveFile(structId, `${name}.struct`, model.structure);
-		await this.saveFile(epiId, `${name}.epi`, model.epiData);
-		await this.saveFile(grefId, `${name}.gref`, model.refGenes);
+		await this.saveFile(structId, `${_id}.struct`, model.structure);
+		await this.saveFile(epiId, `${_id}.epi`, model.epiData);
+		await this.saveFile(grefId, `${_id}.gref`, model.refGenes);
 		await this.mongoClient.db('files').collection<ModelFile>('metadata').insertOne(modelFile);
 
 		return {
@@ -68,7 +75,7 @@ export class FilesService {
 			epiData: epiId,
 			refGenes: grefId,
 			textures: textureIds,
-			link: `http://localhost:3000/view/${modelId}`
+			link: `http://localhost:3000/view/${_id}`
 		};
 	}
 
@@ -108,12 +115,20 @@ export class FilesService {
 	}
 
 	/**
-	 * Fetches a function from the db
-	 * TODO: refactor to use id instead of name
+	 * Fetches a file from the db
 	 * @param name name of the file
 	 * @returns the data (as a stream) of the file
 	 */
 	public getFile(name: string): GridFSBucketReadStream {
 		return this.gridFS.openDownloadStreamByName(name);
+	}
+
+	/**
+	 * Checks whether a file with the given name exists
+	 * @param name name of the file
+	 * @returns whether the file exists or not
+	 */
+	public async fileExists(name: string): Promise<boolean> {
+		return (await this.gridFS.find({ filename: name }).count()) > 0;
 	}
 }

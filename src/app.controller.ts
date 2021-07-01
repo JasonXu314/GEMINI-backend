@@ -76,13 +76,15 @@ export class AppController {
 			return;
 		}
 		if (ext === 'png') {
+			if (!(await this.filesService.fileExists(file))) {
+				throw new NotFoundException(`File with name ${file} does not exist`);
+			}
 			res.setHeader('Content-Type', 'image/png');
 			res.setHeader('Content-Disposition', `attachment; filename="${file}"; filename*=utf-8"${file}`);
 			this.filesService.getFile(file).pipe(res);
 		} else {
-			const modelName = file.split('.').slice(0, -1).join('.');
-			if (!(await this.filesService.modelExists(modelName))) {
-				throw new NotFoundException(`Model with name ${modelName} does not exist`);
+			if (!(await this.filesService.fileExists(file))) {
+				throw new NotFoundException(`File with name ${file} does not exist`);
 			}
 			res.setHeader('Content-Type', ext === 'gltf' ? 'model/gltf+json' : 'application/octet-stream');
 			res.setHeader('Content-Disposition', `attachment; filename="${file}"; filename*=utf-8"${file}`);
