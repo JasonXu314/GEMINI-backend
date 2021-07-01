@@ -3,6 +3,7 @@ import { GridFSBucket, GridFSBucketReadStream, MongoClient } from 'mongodb';
 import { Readable } from 'stream';
 import { v4 as uuid } from 'uuid';
 
+/** Service for interacting with DB */
 @Injectable()
 export class FilesService {
 	private mongoClient: MongoClient;
@@ -25,10 +26,24 @@ export class FilesService {
 		}
 	}
 
+	/**
+	 * Checks to see if a model with name ``name`` already exists or not
+	 * TODO: refactor to use id instead of model name
+	 * @param name model name
+	 * @returns whether the model is already in the db or not
+	 */
 	public async modelExists(name: string): Promise<boolean> {
 		return (await this.mongoClient.db('files').collection<ModelFile>('metadata').find({ name }).count()) > 0;
 	}
 
+	/**
+	 * Saves a model into the db
+	 * TODO: refactor ot use id instead of model name
+	 * @param name the model name
+	 * @param model the files to save as the model
+	 * @param modelData other model metadata to consider
+	 * @returns the response to the client
+	 */
 	public async saveModel(name: string, model: Model, modelData: ModelData): Promise<SaveFilesResponse> {
 		const modelId = uuid(),
 			gltfId = uuid(),
@@ -57,14 +72,31 @@ export class FilesService {
 		};
 	}
 
+	/**
+	 * Gets the metadata for the model of id ``id``
+	 * @param id the id of the model
+	 * @returns the model metadata
+	 */
 	public async getMetadataById(id: string): Promise<ModelFile | null> {
 		return this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id: id });
 	}
 
+	/**
+	 * Geets the metadata for th emodel of name ``name``
+	 * @param name the name of the model
+	 * @returns the model metadata
+	 */
 	public async getMetadataByName(name: string): Promise<ModelFile | null> {
 		return this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ name });
 	}
 
+	/**
+	 * Helper function to write a file to db (probably should be private)
+	 * @param id the id of the file
+	 * @param name the name of the file
+	 * @param data the data (as a stream) of the file
+	 * @returns a promise that resolves when the file is finished being written to db
+	 */
 	public async saveFile(id: string, name: string, data: Readable): Promise<void> {
 		const uploadStream = this.gridFS.openUploadStreamWithId(id, name);
 		data.pipe(uploadStream);
@@ -75,6 +107,12 @@ export class FilesService {
 		});
 	}
 
+	/**
+	 * Fetches a function from the db
+	 * TODO: refactor to use id instead of name
+	 * @param name name of the file
+	 * @returns the data (as a stream) of the file
+	 */
 	public getFile(name: string): GridFSBucketReadStream {
 		return this.gridFS.openDownloadStreamByName(name);
 	}

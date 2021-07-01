@@ -1,5 +1,6 @@
 import { HasMimeType, IsFile, IsFiles, MemoryStoredFile } from 'nestjs-form-data';
 
+/** Typedef class for file transfer */
 export class CreateModelDto {
 	@IsFile({ message: 'gltf property must be a glTF file' })
 	@HasMimeType(['model/gltf+json'], { message: 'glTF file is not of correct format, must be model/gltf+json' })

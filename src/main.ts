@@ -2,8 +2,10 @@ import { NestFactory } from '@nestjs/core';
 import { config } from 'dotenv';
 import { AppModule } from './app.module';
 
+// Load environment variables (not necessary on heroku, but required in local environment)
 config({ path: './.env' });
 
+// Bootstrap the app
 async function bootstrap() {
 	const app = await NestFactory.create(AppModule);
 

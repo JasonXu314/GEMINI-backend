@@ -5,17 +5,25 @@ import { Readable } from 'stream';
 import { FilesService } from './app.service';
 import { CreateModelDto } from './create-model.dto';
 
+// Don't allow file requests other than these
 const allowedExtensions: string[] = ['gltf', 'bin', 'png', 'struct', 'epi', 'gref'];
 
+/** The main controller for the app */
 @Controller()
 export class AppController {
+	/** Logger module */
 	private readonly logger = new Logger('App');
 
 	constructor(private readonly filesService: FilesService) {}
 
+	/** A noop route that allows the frontend to wake up the heroku app, mitigates cold-start time somewhat */
 	@Post('/wakeup')
 	wakeup() {}
 
+	/**
+	 * Route to handle file uploads, calls service to save files to db
+	 * TODO: refactor to remove named files, and just name them all after the generated id
+	 */
 	@Post('/save')
 	@FormDataRequest({ limits: { fieldSize: 4e9 } })
 	async saveModel(@Body() body: CreateModelDto): Promise<SaveFilesResponse> {
@@ -36,16 +44,18 @@ export class AppController {
 			const flagsVisible = body.flagsVisible;
 			const arcsVisible = body.arcsVisible;
 
-			return await this.filesService.saveModel(
+			const res = await this.filesService.saveModel(
 				gltf.originalName,
 				{ gltf: gltfStream, bin: binStream, structure: structStream, epiData: epiDataStream, refGenes: refGenesStream, textures },
 				{ viewRegion, flagsVisible, arcsVisible }
 			);
+			return res;
 		} else {
 			throw new BadRequestException('Model of that name already exists!');
 		}
 	}
 
+	/** Route to get model data */
 	@Get('/models/:id')
 	async getModel(@Param('id') id: string): Promise<ModelFile> {
 		const metadata = await this.filesService.getMetadataById(id);
@@ -55,6 +65,7 @@ export class AppController {
 		return metadata;
 	}
 
+	/** Gets a file, calls service to fetch file from db */
 	@Get('/:file')
 	async getFile(@Param('file') file: string, @Response() res: ServerResponse): Promise<void> {
 		this.logger.log(`Received request for file ${file}`);
