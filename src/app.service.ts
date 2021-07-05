@@ -53,29 +53,20 @@ export class FilesService {
 	 */
 	public async saveModel(name: string, model: Model, modelData: ModelData): Promise<SaveFilesResponse> {
 		const _id = uuid(),
-			gltfId = uuid(),
-			binId = uuid(),
 			structId = uuid(),
 			epiId = uuid(),
-			grefId = uuid(),
-			textureIds = new Array(model.textures.length).fill(null).map(() => uuid());
-		const modelFile: ModelFile = { _id, gltf: gltfId, bin: binId, textures: textureIds, name, modelData };
-		await this.saveFile(gltfId, `${name}.gltf`, model.gltf);
-		await this.saveFile(binId, `${name}.bin`, model.bin);
-		await Promise.all(model.textures.map((texture, i) => this.saveFile(textureIds[i], texture.name, texture.stream)));
+			grefId = uuid();
+		const modelFile: ModelFile = { _id, name, modelData };
 		await this.saveFile(structId, `${_id}.struct`, model.structure);
 		await this.saveFile(epiId, `${_id}.epi`, model.epiData);
 		await this.saveFile(grefId, `${_id}.gref`, model.refGenes);
 		await this.mongoClient.db('files').collection<ModelFile>('metadata').insertOne(modelFile);
 
 		return {
-			gltf: gltfId,
-			bin: binId,
 			structure: structId,
 			epiData: epiId,
 			refGenes: grefId,
-			textures: textureIds,
-			link: `http://localhost:3000/view/${_id}`
+			link: `http://localhost:3000/share/${_id}`
 		};
 	}
 

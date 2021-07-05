@@ -1,9 +1,6 @@
 type Readable = import('stream').Readable;
 
 interface SaveFilesResponse {
-	gltf: string;
-	bin: string;
-	textures: string[];
 	structure: string;
 	epiData: string;
 	refGenes: string;
@@ -19,24 +16,13 @@ interface ModelData {
 interface ModelFile {
 	_id: string;
 	name: string;
-	gltf: string;
-	bin: string;
-	textures: string[];
 	modelData: ModelData;
 }
 
 interface Model {
-	gltf: Readable;
-	bin: Readable;
 	structure: Readable;
 	epiData: Readable;
 	refGenes: Readable;
-	textures: Texture[];
-}
-
-interface Texture {
-	stream: Readable;
-	name: string;
 }
 
 interface RawVector3 {

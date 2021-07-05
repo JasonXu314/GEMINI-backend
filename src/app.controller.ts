@@ -6,7 +6,7 @@ import { FilesService } from './app.service';
 import { CreateModelDto } from './create-model.dto';
 
 // Don't allow file requests other than these
-const allowedExtensions: string[] = ['gltf', 'bin', 'png', 'struct', 'epi', 'gref'];
+const allowedExtensions: string[] = ['struct', 'epi', 'gref'];
 
 /** The main controller for the app */
 @Controller()
@@ -22,21 +22,14 @@ export class AppController {
 
 	/**
 	 * Route to handle file uploads, calls service to save files to db
-	 * TODO: refactor to remove named files, and just name them all after the generated id
 	 */
 	@Post('/save')
 	@FormDataRequest({ limits: { fieldSize: 4e9 } })
 	async saveModel(@Body() body: CreateModelDto): Promise<SaveFilesResponse> {
-		const gltf = body.gltf;
-		const bin = body.bin;
 		const struct = body.structure;
 		const epiData = body.epiData;
 		const refGenes = body.refGenes;
-		const textureFiles = body.textures;
-		if (!(await this.filesService.modelExists(gltf.originalName))) {
-			const gltfStream = Readable.from(gltf.buffer);
-			const binStream = Readable.from(bin.buffer);
-			const textures = textureFiles.map((file) => ({ stream: Readable.from(file.buffer), name: file.originalName }));
+		if (!(await this.filesService.modelExists(struct.originalName))) {
 			const viewRegion = JSON.parse(body.viewRegion) as ViewRegion;
 			const structStream = Readable.from(struct.buffer);
 			const epiDataStream = Readable.from(epiData.buffer);
@@ -45,8 +38,8 @@ export class AppController {
 			const arcsVisible = body.arcsVisible;
 
 			const res = await this.filesService.saveModel(
-				gltf.originalName,
-				{ gltf: gltfStream, bin: binStream, structure: structStream, epiData: epiDataStream, refGenes: refGenesStream, textures },
+				struct.originalName,
+				{ structure: structStream, epiData: epiDataStream, refGenes: refGenesStream },
 				{ viewRegion, flagsVisible, arcsVisible }
 			);
 			return res;
@@ -72,23 +65,14 @@ export class AppController {
 		const tokenizedFile = file.split('.');
 		const ext = tokenizedFile[tokenizedFile.length - 1];
 		if (!allowedExtensions.includes(ext)) {
-			res.writeHead(400, 'Only requests for gltf, bin, png, struct, epi, gref files are allowed').end();
+			res.writeHead(400, 'Only requests for struct, epi, gref files are allowed').end();
 			return;
 		}
-		if (ext === 'png') {
-			if (!(await this.filesService.fileExists(file))) {
-				throw new NotFoundException(`File with name ${file} does not exist`);
-			}
-			res.setHeader('Content-Type', 'image/png');
-			res.setHeader('Content-Disposition', `attachment; filename="${file}"; filename*=utf-8"${file}`);
-			this.filesService.getFile(file).pipe(res);
-		} else {
-			if (!(await this.filesService.fileExists(file))) {
-				throw new NotFoundException(`File with name ${file} does not exist`);
-			}
-			res.setHeader('Content-Type', ext === 'gltf' ? 'model/gltf+json' : 'application/octet-stream');
-			res.setHeader('Content-Disposition', `attachment; filename="${file}"; filename*=utf-8"${file}`);
-			this.filesService.getFile(file).pipe(res);
+		if (!(await this.filesService.fileExists(file))) {
+			throw new NotFoundException(`File with name ${file} does not exist`);
 		}
+		res.setHeader('Content-Type', 'application/octet-stream');
+		res.setHeader('Content-Disposition', `attachment; filename="${file}"; filename*=utf-8"${file}`);
+		this.filesService.getFile(file).pipe(res);
 	}
 }
