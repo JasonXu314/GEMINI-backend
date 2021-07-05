@@ -3,7 +3,11 @@ import { config } from 'dotenv';
 import { AppModule } from './app.module';
 
 // Load environment variables (not necessary on heroku, but required in local environment)
-config({ path: './.env' });
+if (!process.env.PORT) {
+	config({ path: './.env' });
+} else {
+	console.log("Running on Heroku, don' load .env");
+}
 
 // Bootstrap the app
 async function bootstrap() {
