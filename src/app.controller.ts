@@ -18,7 +18,9 @@ export class AppController {
 
 	/** A noop route that allows the frontend to wake up the heroku app, mitigates cold-start time somewhat */
 	@Post('/wakeup')
-	wakeup() {}
+	wakeup() {
+		this.logger.log('Received Wakeup Call');
+	}
 
 	/**
 	 * Route to handle file uploads, calls service to save files to db

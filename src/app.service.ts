@@ -17,9 +17,12 @@ export class FilesService {
 		} else {
 			MongoClient.connect(process.env.MONGODB_URL, { useUnifiedTopology: true }).then((client) => {
 				this.mongoClient = client;
-				const audioDb = client.db('files');
-				this.gridFS = new GridFSBucket(audioDb);
+				const filesDb = client.db('files');
+				this.gridFS = new GridFSBucket(filesDb);
 				process.on('SIGTERM', async () => {
+					await this.mongoClient.close();
+				});
+				process.on('SIGKILL', async () => {
 					await this.mongoClient.close();
 				});
 			});
