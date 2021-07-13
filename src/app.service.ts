@@ -68,7 +68,7 @@ export class FilesService {
 		await this.saveFile(grefId, `${_id}.gref`, model.refGenes);
 		await this.mongoClient.db('files').collection<ModelFile>('metadata').insertOne(modelFile);
 
-		launch().then((browser) => {
+		launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] }).then((browser) => {
 			this.logger.log('Making preview');
 			browser.newPage().then(async (page) => {
 				this.logger.log('Loaded Page');
