@@ -17,6 +17,35 @@ interface ModelFile {
 	_id: string;
 	name: string;
 	modelData: ModelData;
+	sortHist: Sort[];
+	annotations: RawAnnotation[];
+}
+
+interface Sort {
+	_id: string;
+	name: string;
+	radSelect: RadSelectParams | null;
+	volSelect: VolSelectParams | null;
+	bpsSelect: BPSParams | null;
+}
+
+interface RadSelectParams {
+	position: RawVector3;
+	radius: number;
+}
+
+interface VolSelectParams {
+	minX: number;
+	maxX: number;
+	minY: number;
+	maxY: number;
+	minZ: number;
+	maxZ: number;
+}
+
+interface BPSParams {
+	regions: string;
+	radius: number;
 }
 
 interface Model {
@@ -81,4 +110,9 @@ interface ViewRegion {
 	length: number;
 	chrLength: number;
 	chr: number;
+}
+
+interface RawAnnotation {
+	mesh: string;
+	text: string;
 }

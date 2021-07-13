@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import { GridFSBucket, GridFSBucketReadStream, MongoClient } from 'mongodb';
 import { Readable } from 'stream';
 import { v4 as uuid } from 'uuid';
@@ -20,9 +20,6 @@ export class FilesService {
 				const filesDb = client.db('files');
 				this.gridFS = new GridFSBucket(filesDb);
 				process.on('SIGTERM', async () => {
-					await this.mongoClient.close();
-				});
-				process.on('SIGKILL', async () => {
 					await this.mongoClient.close();
 				});
 			});
@@ -59,7 +56,7 @@ export class FilesService {
 			structId = uuid(),
 			epiId = uuid(),
 			grefId = uuid();
-		const modelFile: ModelFile = { _id, name, modelData };
+		const modelFile: ModelFile = { _id, name, modelData, sortHist: [], annotations: [] };
 		await this.saveFile(structId, `${_id}.struct`, model.structure);
 		await this.saveFile(epiId, `${_id}.epi`, model.epiData);
 		await this.saveFile(grefId, `${_id}.gref`, model.refGenes);
@@ -69,7 +66,7 @@ export class FilesService {
 			structure: structId,
 			epiData: epiId,
 			refGenes: grefId,
-			link: `http://localhost:3000/share/${_id}`
+			link: `${process.env.VIEW_BASE_URL}/share/${_id}`
 		};
 	}
 
@@ -124,5 +121,129 @@ export class FilesService {
 	 */
 	public async fileExists(name: string): Promise<boolean> {
 		return (await this.gridFS.find({ filename: name }).count()) > 0;
+	}
+
+	/**
+	 * Gets the sorts of the given model
+	 * @param _id the id of the model
+	 * @returns the sorts on the model of id _id
+	 */
+	public async getSorts(_id: string): Promise<Sort[]> {
+		const sorts = (await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id }))?.sortHist;
+
+		if (!sorts) {
+			throw new NotFoundException(`Model with id ${_id} does not exist`);
+		}
+
+		return sorts;
+	}
+
+	/**
+	 * Appends a sort onto the history of the model with id _id
+	 * @param _id the id of the model to modify
+	 * @param newSort the sort to add
+	 * @returns the new sort history
+	 */
+	public async addSort(_id: string, newSort: Sort): Promise<Sort[]> {
+		const res = await this.mongoClient
+			.db('files')
+			.collection<ModelFile>('metadata')
+			.findOneAndUpdate({ _id }, { $push: { sortHist: newSort } });
+
+		if (res.ok) {
+			return [...res.value!.sortHist, newSort];
+		} else {
+			throw new InternalServerErrorException('DB Failed to update');
+		}
+	}
+
+	/**
+	 * Renames a sort to the given name
+	 * @param _id the id of the model to modify
+	 * @param id the id of the sort to rename
+	 * @param name the new name of the sort
+	 * @returns the new sorts after the rename
+	 */
+	public async renameSort(_id: string, id: string, name: string): Promise<Sort[]> {
+		const currHist = (await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id }))?.sortHist;
+
+		if (!currHist) {
+			throw new NotFoundException(`Model with id ${_id} does not exist`);
+		}
+
+		const currSort = currHist.find((sort) => sort._id === id);
+
+		if (!currSort) {
+			throw new NotFoundException(`Sort with id ${id} does not exist on model with id ${_id}`);
+		}
+
+		currSort.name = name;
+
+		await this.mongoClient
+			.db('files')
+			.collection<ModelFile>('metadata')
+			.findOneAndUpdate({ _id }, { $set: { sortHist: currHist } });
+		return currHist;
+	}
+
+	/**
+	 * Deletes a given sort
+	 * @param _id the id of the model to modify
+	 * @param id the id of the sort to delete
+	 * @returns the new sorts after the deletion
+	 */
+	public async deleteSort(_id: string, id: string): Promise<Sort[]> {
+		const currHist = (await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id }))?.sortHist;
+
+		if (!currHist) {
+			throw new NotFoundException(`Model with id ${_id} does not exist`);
+		}
+
+		const newHist = currHist.filter((sort) => sort._id !== id);
+
+		await this.mongoClient
+			.db('files')
+			.collection<ModelFile>('metadata')
+			.findOneAndUpdate({ _id }, { $set: { sortHist: newHist } });
+		return newHist;
+	}
+
+	public async getAnnotations(_id: string): Promise<RawAnnotation[]> {
+		const annotations = (await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id }))?.annotations;
+
+		if (!annotations) {
+			throw new NotFoundException(`Model with id ${_id} does not exist`);
+		}
+
+		return annotations;
+	}
+
+	public async addAnnotation(_id: string, annotation: RawAnnotation): Promise<RawAnnotation[]> {
+		const res = await this.mongoClient
+			.db('files')
+			.collection<ModelFile>('metadata')
+			.findOneAndUpdate({ _id }, { $push: { annotations: annotation } });
+
+		if (res.ok) {
+			return [...res.value!.annotations, annotation];
+		} else {
+			throw new InternalServerErrorException('DB Failed to update');
+		}
+	}
+
+	public async removeAnnotation(_id: string, name: string): Promise<RawAnnotation[]> {
+		const currAnns = (await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id }))?.annotations;
+
+		if (!currAnns) {
+			throw new NotFoundException(`Model with id ${_id} does not exist`);
+		}
+
+		const newAnns = currAnns.filter((ann) => ann.mesh !== name);
+
+		await this.mongoClient
+			.db('files')
+			.collection<ModelFile>('metadata')
+			.findOneAndUpdate({ _id }, { $set: { annotations: newAnns } });
+		return newAnns;
 	}
 }

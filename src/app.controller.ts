@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Logger, NotFoundException, Param, Post, Response } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Logger, NotFoundException, Param, Patch, Post, Query, Response } from '@nestjs/common';
 import { ServerResponse } from 'http';
 import { FormDataRequest } from 'nestjs-form-data';
 import { Readable } from 'stream';
@@ -58,6 +58,41 @@ export class AppController {
 			throw new NotFoundException(`Model with id ${id} does not exist`);
 		}
 		return metadata;
+	}
+
+	@Get('/history')
+	async getHistory(@Query('id') id: string): Promise<Sort[]> {
+		return this.filesService.getSorts(id);
+	}
+
+	@Post('/history')
+	async pushHist(@Body('sort') sort: Sort, @Body('id') id: string): Promise<Sort[]> {
+		return this.filesService.addSort(id, sort);
+	}
+
+	@Patch('/history')
+	async renameSort(@Body('id') modelId: string, @Body('_id') sortId: string, @Body('name') name: string): Promise<Sort[]> {
+		return this.filesService.renameSort(modelId, sortId, name);
+	}
+
+	@Delete('/history')
+	async deleteSort(@Body('id') modelId: string, @Body('_id') sortId: string): Promise<Sort[]> {
+		return this.filesService.deleteSort(modelId, sortId);
+	}
+
+	@Get('/annotations')
+	async getAnnotations(@Query('id') modelId: string): Promise<RawAnnotation[]> {
+		return this.filesService.getAnnotations(modelId);
+	}
+
+	@Post('/annotations')
+	async makeAnnotation(@Body('id') modelId: string, @Body('annotation') annotation: RawAnnotation): Promise<RawAnnotation[]> {
+		return this.filesService.addAnnotation(modelId, annotation);
+	}
+
+	@Delete('/annotations')
+	async delAnnotation(@Body('id') modelId: string, @Body('name') name: string): Promise<RawAnnotation[]> {
+		return this.filesService.removeAnnotation(modelId, name);
 	}
 
 	/** Gets a file, calls service to fetch file from db */
