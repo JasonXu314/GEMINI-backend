@@ -28,6 +28,7 @@
 		"dotenv": "^10.0.0",
 		"mongodb": "^3.6.9",
 		"nestjs-form-data": "^1.4.3",
+		"puppeteer": "^10.1.0",
 		"reflect-metadata": "^0.1.13",
 		"rimraf": "^3.0.2",
 		"rxjs": "^7.1.0"

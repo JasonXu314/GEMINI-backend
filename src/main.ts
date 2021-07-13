@@ -13,7 +13,7 @@ if (!process.env.PORT) {
 async function bootstrap() {
 	const app = await NestFactory.create(AppModule);
 
-	app.enableCors({ origin: ['http://localhost:3000', 'https://gemini-castor.vercel.app'], credentials: true });
+	app.enableCors({ origin: ['http://localhost:3000', 'http://localhost:3001', 'https://gemini-castor.vercel.app'], credentials: true });
 
 	await app.listen(process.env.PORT || 5000);
 }

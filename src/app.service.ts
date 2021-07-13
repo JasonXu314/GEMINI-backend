@@ -1,5 +1,6 @@
 import { Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import { GridFSBucket, GridFSBucketReadStream, MongoClient } from 'mongodb';
+import { launch } from 'puppeteer';
 import { Readable } from 'stream';
 import { v4 as uuid } from 'uuid';
 
@@ -44,6 +45,10 @@ export class FilesService {
 		return (await this.mongoClient.db('files').collection<ModelFile>('metadata').find({ _id }).count()) > 0;
 	}
 
+	public async getAllModels(): Promise<ModelFile[]> {
+		return this.mongoClient.db('files').collection<ModelFile>('metadata').find({}).toArray();
+	}
+
 	/**
 	 * Saves a model into the db
 	 * @param name the model name
@@ -56,11 +61,24 @@ export class FilesService {
 			structId = uuid(),
 			epiId = uuid(),
 			grefId = uuid();
+		this.logger.log(`Saving model with name ${name} and id ${_id}`);
 		const modelFile: ModelFile = { _id, name, modelData, sortHist: [], annotations: [] };
 		await this.saveFile(structId, `${_id}.struct`, model.structure);
 		await this.saveFile(epiId, `${_id}.epi`, model.epiData);
 		await this.saveFile(grefId, `${_id}.gref`, model.refGenes);
 		await this.mongoClient.db('files').collection<ModelFile>('metadata').insertOne(modelFile);
+
+		launch().then((browser) => {
+			this.logger.log('Making preview');
+			browser.newPage().then(async (page) => {
+				this.logger.log('Loaded Page');
+				await page.goto(`${process.env.VIEW_BASE_URL}/preview/${_id}`);
+				await new Promise((resolve) => setTimeout(resolve, 5000));
+				const sc = (await page.screenshot()) as Buffer;
+
+				this.saveFile(uuid(), `${_id}-preview.png`, Readable.from(sc));
+			});
+		});
 
 		return {
 			structure: structId,

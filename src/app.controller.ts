@@ -6,7 +6,7 @@ import { FilesService } from './app.service';
 import { CreateModelDto } from './create-model.dto';
 
 // Don't allow file requests other than these
-const allowedExtensions: string[] = ['struct', 'epi', 'gref'];
+const allowedExtensions: string[] = ['struct', 'epi', 'gref', 'png'];
 
 /** The main controller for the app */
 @Controller()
@@ -48,6 +48,11 @@ export class AppController {
 		} else {
 			throw new BadRequestException('Model of that name already exists!');
 		}
+	}
+
+	@Get('/models')
+	async getAllModels(): Promise<ModelFile[]> {
+		return this.filesService.getAllModels();
 	}
 
 	/** Route to get model data */
@@ -102,14 +107,20 @@ export class AppController {
 		const tokenizedFile = file.split('.');
 		const ext = tokenizedFile[tokenizedFile.length - 1];
 		if (!allowedExtensions.includes(ext)) {
-			res.writeHead(400, 'Only requests for struct, epi, gref files are allowed').end();
+			res.writeHead(400, 'Only requests for struct, epi, gref, and png files are allowed').end();
 			return;
 		}
 		if (!(await this.filesService.fileExists(file))) {
 			throw new NotFoundException(`File with name ${file} does not exist`);
 		}
-		res.setHeader('Content-Type', 'application/octet-stream');
-		res.setHeader('Content-Disposition', `attachment; filename="${file}"; filename*=utf-8"${file}`);
-		this.filesService.getFile(file).pipe(res);
+		if (ext === 'png') {
+			res.setHeader('Content-Type', 'image/png');
+			res.setHeader('Content-Disposition', `attachment; filename="${file}"; filename*=utf-8"${file}`);
+			this.filesService.getFile(file).pipe(res);
+		} else {
+			res.setHeader('Content-Type', 'application/octet-stream');
+			res.setHeader('Content-Disposition', `attachment; filename="${file}"; filename*=utf-8"${file}`);
+			this.filesService.getFile(file).pipe(res);
+		}
 	}
 }
