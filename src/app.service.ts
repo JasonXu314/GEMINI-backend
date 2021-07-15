@@ -79,6 +79,7 @@ export class FilesService {
 
 				this.saveFile(uuid(), `${_id}-preview.png`, Readable.from(sc));
 				this.logger.log(`Saved Preview with id ${_id}`);
+				await browser.close();
 			});
 		});
 
