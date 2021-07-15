@@ -56,13 +56,13 @@ export class FilesService {
 	 * @param modelData other model metadata to consider
 	 * @returns the response to the client
 	 */
-	public async saveModel(name: string, model: Model, modelData: ModelData): Promise<SaveFilesResponse> {
+	public async saveModel(name: string, model: Model, modelData: ModelData, annotations: RawAnnotation[]): Promise<SaveFilesResponse> {
 		const _id = uuid(),
 			structId = uuid(),
 			epiId = uuid(),
 			grefId = uuid();
 		this.logger.log(`Saving model with name ${name} and id ${_id}`);
-		const modelFile: ModelFile = { _id, name, modelData, sortHist: [], annotations: [] };
+		const modelFile: ModelFile = { _id, name, modelData, sortHist: [], annotations };
 		await this.saveFile(structId, `${_id}.struct`, model.structure);
 		await this.saveFile(epiId, `${_id}.epi`, model.epiData);
 		await this.saveFile(grefId, `${_id}.gref`, model.refGenes);

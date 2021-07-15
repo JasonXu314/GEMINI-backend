@@ -15,6 +15,7 @@ export class CreateModelDto {
 	refGenes: MemoryStoredFile;
 
 	viewRegion: string;
+	annotations: string;
 	flagsVisible: boolean;
 	arcsVisible: boolean;
 }

@@ -33,6 +33,7 @@ export class AppController {
 		const refGenes = body.refGenes;
 		if (!(await this.filesService.modelExists(struct.originalName))) {
 			const viewRegion = JSON.parse(body.viewRegion) as ViewRegion;
+			const annotations = JSON.parse(body.annotations) as RawAnnotation[];
 			const structStream = Readable.from(struct.buffer);
 			const epiDataStream = Readable.from(epiData.buffer);
 			const refGenesStream = Readable.from(refGenes.buffer);
@@ -42,7 +43,8 @@ export class AppController {
 			const res = await this.filesService.saveModel(
 				struct.originalName,
 				{ structure: structStream, epiData: epiDataStream, refGenes: refGenesStream },
-				{ viewRegion, flagsVisible, arcsVisible }
+				{ viewRegion, flagsVisible, arcsVisible },
+				annotations
 			);
 			return res;
 		} else {
