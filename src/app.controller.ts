@@ -291,6 +291,17 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 								}
 								break;
 							}
+							case 'END_LIVE': {
+								const id = this.rtService.getId(client)!;
+								const roomId = this.rtService.getRoomId(client)!;
+								const liveSession = this.rtService.getLiveSession(roomId);
+
+								if (liveSession && id === liveSession.hostID) {
+									this.rtService.broadcast(roomId, { type: 'END_LIVE' });
+									this.rtService.closeLiveSession(roomId);
+									this.dbService.closeLive(roomId);
+								}
+							}
 						}
 					});
 				} catch (e: unknown) {

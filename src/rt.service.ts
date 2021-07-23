@@ -100,6 +100,12 @@ export class RTService {
 		}
 	}
 
+	public closeLiveSession(roomId: string): void {
+		if (this.liveSessions.has(roomId)) {
+			this.liveSessions.delete(roomId);
+		}
+	}
+
 	public getLiveSession(roomId: string): LiveSessionData | undefined {
 		return this.liveSessions.get(roomId);
 	}
