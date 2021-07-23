@@ -2,11 +2,12 @@
 import { Logger, Module } from '@nestjs/common';
 import { NestjsFormDataModule } from 'nestjs-form-data';
 import { AppController } from './app.controller';
-import { FilesService } from './app.service';
+import { DBService } from './db.service';
+import { RTService } from './rt.service';
 
 @Module({
 	imports: [NestjsFormDataModule],
 	controllers: [AppController],
-	providers: [FilesService, Logger]
+	providers: [DBService, Logger, AppController, RTService]
 })
 export class AppModule {}

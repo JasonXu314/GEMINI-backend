@@ -1,20 +1,26 @@
-import { BadRequestException, Body, Controller, Delete, Get, Logger, NotFoundException, Param, Patch, Post, Query, Response } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Header, Logger, NotFoundException, Param, Patch, Post, Query, Response } from '@nestjs/common';
+import { OnGatewayConnection, OnGatewayInit, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
+import { randomUUID } from 'crypto';
 import { ServerResponse } from 'http';
 import { FormDataRequest } from 'nestjs-form-data';
 import { Readable } from 'stream';
-import { FilesService } from './app.service';
+import { default as Socket, Server } from 'ws';
 import { CreateModelDto } from './create-model.dto';
+import { DBService } from './db.service';
+import { RTService } from './rt.service';
 
 // Don't allow file requests other than these
 const allowedExtensions: string[] = ['struct', 'epi', 'gref', 'png'];
 
 /** The main controller for the app */
 @Controller()
-export class AppController {
+@WebSocketGateway({ serveClient: false })
+export class AppController implements OnGatewayInit, OnGatewayConnection {
 	/** Logger module */
 	private readonly logger = new Logger('App');
+	@WebSocketServer() private readonly server: Server;
 
-	constructor(private readonly filesService: FilesService) {}
+	constructor(private readonly dbService: DBService, private readonly rtService: RTService) {}
 
 	/** A noop route that allows the frontend to wake up the heroku app, mitigates cold-start time somewhat */
 	@Post('/wakeup')
@@ -31,7 +37,7 @@ export class AppController {
 		const struct = body.structure;
 		const epiData = body.epiData;
 		const refGenes = body.refGenes;
-		if (!(await this.filesService.modelExists(struct.originalName))) {
+		if (!(await this.dbService.modelExists(struct.originalName))) {
 			const viewRegion = JSON.parse(body.viewRegion) as ViewRegion;
 			const annotations = JSON.parse(body.annotations) as RawAnnotation[];
 			const structStream = Readable.from(struct.buffer);
@@ -40,7 +46,7 @@ export class AppController {
 			const flagsVisible = body.flagsVisible;
 			const arcsVisible = body.arcsVisible;
 
-			const res = await this.filesService.saveModel(
+			const res = await this.dbService.saveModel(
 				struct.originalName,
 				{ structure: structStream, epiData: epiDataStream, refGenes: refGenesStream },
 				{ viewRegion, flagsVisible, arcsVisible },
@@ -54,52 +60,101 @@ export class AppController {
 
 	@Get('/models')
 	async getAllModels(): Promise<ModelFile[]> {
-		return this.filesService.getAllModels();
+		return this.dbService.getAllModels();
 	}
 
 	/** Route to get model data */
 	@Get('/models/:id')
-	async getModel(@Param('id') id: string): Promise<ModelFile> {
-		const metadata = await this.filesService.getMetadataById(id);
+	async getModel(@Param('id') id: string): Promise<ModelFile & { socketId: string }> {
+		const metadata = await this.dbService.getMetadataById(id);
 		if (!metadata) {
 			throw new NotFoundException(`Model with id ${id} does not exist`);
 		}
-		return metadata;
+
+		const socketId = randomUUID();
+
+		this.rtService.assignId(socketId, id);
+
+		return { ...metadata, socketId };
 	}
 
 	@Get('/history')
 	async getHistory(@Query('id') id: string): Promise<Sort[]> {
-		return this.filesService.getSorts(id);
+		return this.dbService.getSorts(id);
 	}
 
 	@Post('/history')
 	async pushHist(@Body('sort') sort: Sort, @Body('id') id: string): Promise<Sort[]> {
-		return this.filesService.addSort(id, sort);
+		const result = await this.dbService.addSort(id, sort);
+
+		this.rtService.broadcast(id, { type: 'HIST_ADD', newSort: sort });
+
+		return result;
 	}
 
 	@Patch('/history')
 	async renameSort(@Body('id') modelId: string, @Body('_id') sortId: string, @Body('name') name: string): Promise<Sort[]> {
-		return this.filesService.renameSort(modelId, sortId, name);
+		const result = await this.dbService.renameSort(modelId, sortId, name);
+
+		this.rtService.broadcast(modelId, { type: 'HIST_EDIT', id: sortId, name });
+
+		return result;
 	}
 
 	@Delete('/history')
 	async deleteSort(@Body('id') modelId: string, @Body('_id') sortId: string): Promise<Sort[]> {
-		return this.filesService.deleteSort(modelId, sortId);
+		const result = await this.dbService.deleteSort(modelId, sortId);
+
+		this.rtService.broadcast(modelId, { type: 'HIST_DEL', id: sortId });
+
+		return result;
 	}
 
 	@Get('/annotations')
 	async getAnnotations(@Query('id') modelId: string): Promise<RawAnnotation[]> {
-		return this.filesService.getAnnotations(modelId);
+		return this.dbService.getAnnotations(modelId);
 	}
 
 	@Post('/annotations')
 	async makeAnnotation(@Body('id') modelId: string, @Body('annotation') annotation: RawAnnotation): Promise<RawAnnotation[]> {
-		return this.filesService.addAnnotation(modelId, annotation);
+		const result = await this.dbService.addAnnotation(modelId, annotation);
+
+		this.rtService.broadcast(modelId, { type: 'ANN_ADD', newAnnotation: annotation });
+
+		return result;
 	}
 
 	@Delete('/annotations')
 	async delAnnotation(@Body('id') modelId: string, @Body('name') name: string): Promise<RawAnnotation[]> {
-		return this.filesService.removeAnnotation(modelId, name);
+		const result = await this.dbService.removeAnnotation(modelId, name);
+
+		this.rtService.broadcast(modelId, { type: 'ANN_DEL', mesh: name });
+
+		return result;
+	}
+
+	@Get('/sockets')
+	@Header('Content-Type', 'text/html')
+	getTestPage(): string {
+		return `
+	<!DOCTYPE html>
+	<html>
+		<head>
+			<title>Socket Test Page</title>
+			<style>body { margin: 0; padding: 2em; } h4 { margin: 0; }</style>
+		</head>
+		<body>
+			${[...this.rtService.getRooms().entries()].map(
+				([roomId, sockets]) => `<h4>${roomId}</h4>
+			<ul>${sockets.map(
+				(socket) => `
+				<li>${this.rtService.getId(socket)}</li>`
+			)}
+			</ul>`
+			)}
+		</body>
+	</html>
+		`;
 	}
 
 	/** Gets a file, calls service to fetch file from db */
@@ -112,17 +167,117 @@ export class AppController {
 			res.writeHead(400, 'Only requests for struct, epi, gref, and png files are allowed').end();
 			return;
 		}
-		if (!(await this.filesService.fileExists(file))) {
+		if (!(await this.dbService.fileExists(file))) {
 			throw new NotFoundException(`File with name ${file} does not exist`);
 		}
 		if (ext === 'png') {
 			res.setHeader('Content-Type', 'image/png');
 			res.setHeader('Content-Disposition', `attachment; filename="${file}"; filename*=utf-8"${file}`);
-			this.filesService.getFile(file).pipe(res);
+			this.dbService.getFile(file).pipe(res);
 		} else {
 			res.setHeader('Content-Type', 'application/octet-stream');
 			res.setHeader('Content-Disposition', `attachment; filename="${file}"; filename*=utf-8"${file}`);
-			this.filesService.getFile(file).pipe(res);
+			this.dbService.getFile(file).pipe(res);
 		}
+	}
+
+	// Gateway Methods
+
+	afterInit(): void {
+		this.logger.log('Gateway Initialized');
+	}
+
+	handleConnection(client: Socket): void {
+		this.logger.log(`New connection`);
+
+		client.once('message', (msg: string) => {
+			const parsedMsg = JSON.parse(msg) as IncomingSocketMsgs;
+
+			if (parsedMsg.type === 'LINK') {
+				try {
+					this.rtService.joinRoom(client, parsedMsg.id, parsedMsg.roomId);
+					this.logger.log(`Client with id ${this.rtService.getId(client)} linked with room ${this.rtService.getRoomId(client)}`);
+
+					client.once('close', () => {
+						const id = this.rtService.getId(client)!;
+						const roomId = this.rtService.getRoomId(client)!;
+						const liveSession = this.rtService.getLiveSession(roomId);
+
+						this.logger.log(`Client with id ${this.rtService.getId(client)} disconnected from room ${this.rtService.getRoomId(client)}`);
+						this.rtService.destroy(client);
+
+						if (liveSession) {
+							if (id === liveSession.hostID) {
+								this.dbService.closeLive(roomId);
+							} else {
+								this.dbService.removeParticipant(roomId, id);
+							}
+						}
+					});
+
+					client.on('message', (msg: string) => {
+						const message = JSON.parse(msg) as IncomingSocketMsgs;
+
+						switch (message.type) {
+							case 'START_LIVE': {
+								const id = this.rtService.getId(client)!;
+								const roomId = this.rtService.getRoomId(client)!;
+								const { name, camPos, camRot } = message;
+								const sessionData = {
+									participants: [{ id, name }],
+									camPos,
+									camRot,
+									hostID: id
+								};
+
+								try {
+									this.rtService.makeLiveSession(roomId, sessionData);
+									this.dbService.makeLive(roomId, sessionData);
+
+									this.rtService.broadcast(roomId, { type: 'START_LIVE', data: sessionData });
+								} catch (e: unknown) {
+									this.logger.error(e);
+								}
+								break;
+							}
+							case 'CAM_CHANGE': {
+								const id = this.rtService.getId(client)!;
+								const roomId = this.rtService.getRoomId(client)!;
+								const liveSession = this.rtService.getLiveSession(roomId);
+
+								if (liveSession && id === liveSession.hostID) {
+									const { camPos, camRot } = message;
+									liveSession.camPos = camPos;
+									liveSession.camRot = camRot;
+
+									this.rtService.broadcast(roomId, { type: 'CAM_CHANGE', camPos, camRot });
+									this.dbService.adjustCamera(roomId, camPos, camRot);
+								}
+								break;
+							}
+							case 'JOIN_LIVE': {
+								const id = this.rtService.getId(client)!;
+								const roomId = this.rtService.getRoomId(client)!;
+								const liveSession = this.rtService.getLiveSession(roomId);
+								this.logger.log(`Client with id ${id} joined the live session in ${roomId}`);
+
+								if (liveSession) {
+									const { name } = message;
+									liveSession.participants.push({ id, name });
+
+									liveSession.participants.forEach(({ id: sid }) => {
+										this.rtService.getSocket(sid)!.send(JSON.stringify({ type: 'JOIN_LIVE', id, name } as OutboundJoinLiveMsg));
+									});
+									this.dbService.addParticipant(roomId, id, name);
+								}
+								break;
+							}
+						}
+					});
+				} catch (e: unknown) {
+					this.logger.error(e);
+				}
+			}
+		});
 	}
 }

@@ -1,22 +1,23 @@
 import { Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
-import { GridFSBucket, GridFSBucketReadStream, MongoClient } from 'mongodb';
+import { GridFSBucket, GridFSBucketReadStream, MongoClient, ObjectId } from 'mongodb';
 import { launch } from 'puppeteer';
 import { Readable } from 'stream';
 import { v4 as uuid } from 'uuid';
 
 /** Service for interacting with DB */
 @Injectable()
-export class FilesService {
+export class DBService {
 	private mongoClient: MongoClient;
 	private gridFS: GridFSBucket;
+	private readonly logger: Logger;
 
-	constructor(private readonly logger: Logger) {
+	constructor() {
 		this.logger = new Logger('Bin Handler');
 		if (typeof process.env.MONGODB_URL === 'undefined') {
 			this.logger.log('MongoDB URL undefined');
 			throw new Error();
 		} else {
-			MongoClient.connect(process.env.MONGODB_URL, { useUnifiedTopology: true }).then((client) => {
+			MongoClient.connect(process.env.MONGODB_URL).then((client) => {
 				this.mongoClient = client;
 				const filesDb = client.db('files');
 				this.gridFS = new GridFSBucket(filesDb);
@@ -62,7 +63,7 @@ export class FilesService {
 			epiId = uuid(),
 			grefId = uuid();
 		this.logger.log(`Saving model with name ${name} and id ${_id}`);
-		const modelFile: ModelFile = { _id, name, modelData, sortHist: [], annotations };
+		const modelFile: ModelFile = { _id, name, modelData, sortHist: [], annotations, live: false, session: null };
 		await this.saveFile(structId, `${_id}.struct`, model.structure);
 		await this.saveFile(epiId, `${_id}.epi`, model.epiData);
 		await this.saveFile(grefId, `${_id}.gref`, model.refGenes);
@@ -96,7 +97,7 @@ export class FilesService {
 	 * @param id the id of the model
 	 * @returns the model metadata
 	 */
-	public async getMetadataById(id: string): Promise<ModelFile | null> {
+	public async getMetadataById(id: string): Promise<ModelFile | undefined> {
 		return this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id: id });
 	}
 
@@ -105,7 +106,7 @@ export class FilesService {
 	 * @param name the name of the model
 	 * @returns the model metadata
 	 */
-	public async getMetadataByName(name: string): Promise<ModelFile | null> {
+	public async getMetadataByName(name: string): Promise<ModelFile | undefined> {
 		return this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ name });
 	}
 
@@ -117,8 +118,8 @@ export class FilesService {
 	 * @returns a promise that resolves when the file is finished being written to db
 	 */
 	public async saveFile(id: string, name: string, data: Readable): Promise<void> {
-		const uploadStream = this.gridFS.openUploadStreamWithId(id, name);
-		data.pipe(uploadStream);
+		const uploadStream = this.gridFS.openUploadStreamWithId(id as unknown as ObjectId, name);
+		data.pipe(uploadStream as unknown as NodeJS.WritableStream);
 
 		return new Promise((resolve) => {
 			uploadStream.on('close', resolve);
@@ -266,5 +267,80 @@ export class FilesService {
 			.collection<ModelFile>('metadata')
 			.findOneAndUpdate({ _id }, { $set: { annotations: newAnns } });
 		return newAnns;
+	}
+
+	public async makeLive(_id: string, data: LiveSessionData): Promise<void> {
+		const model = await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id });
+
+		if (!model) {
+			throw new NotFoundException(`Model with id ${_id} does not exist`);
+		}
+
+		model.live = true;
+		model.session = data;
+
+		await this.mongoClient.db('files').collection<ModelFile>('metadata').findOneAndReplace({ _id }, model);
+	}
+
+	public async closeLive(_id: string): Promise<void> {
+		const model = await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id });
+
+		if (!model) {
+			throw new NotFoundException(`Model with id ${_id} does not exist`);
+		}
+
+		model.live = false;
+		model.session = null;
+
+		await this.mongoClient.db('files').collection<ModelFile>('metadata').findOneAndReplace({ _id }, model);
+	}
+
+	public async adjustCamera(_id: string, camPos: RawVector3, camRot: RawVector3): Promise<void> {
+		const model = await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id });
+
+		if (!model) {
+			throw new NotFoundException(`Model with id ${_id} does not exist`);
+		}
+
+		if (!model.session) {
+			throw new InternalServerErrorException(`No session data for model with id ${_id}`);
+		}
+
+		model.session.camPos = camPos;
+		model.session.camRot = camRot;
+
+		await this.mongoClient.db('files').collection<ModelFile>('metadata').findOneAndReplace({ _id }, model);
+	}
+
+	public async addParticipant(_id: string, id: string, name: string): Promise<void> {
+		const model = await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id });
+
+		if (!model) {
+			throw new NotFoundException(`Model with id ${_id} does not exist`);
+		}
+
+		if (!model.session) {
+			throw new InternalServerErrorException(`No session data for model with id ${_id}`);
+		}
+
+		model.session.participants.push({ id, name });
+
+		await this.mongoClient.db('files').collection<ModelFile>('metadata').findOneAndReplace({ _id }, model);
+	}
+
+	public async removeParticipant(_id: string, id: string): Promise<void> {
+		const model = await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id });
+
+		if (!model) {
+			throw new NotFoundException(`Model with id ${_id} does not exist`);
+		}
+
+		if (!model.session) {
+			throw new InternalServerErrorException(`No session data for model with id ${_id}`);
+		}
+
+		model.session.participants = model.session.participants.filter((p) => p.id !== id);
+
+		await this.mongoClient.db('files').collection<ModelFile>('metadata').findOneAndReplace({ _id }, model);
 	}
 }

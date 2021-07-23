@@ -1,5 +1,18 @@
 type Readable = import('stream').Readable;
 
+type IncomingSocketMsgs = LinkMsg | StartLiveMsg | JoinLiveMsg | LeaveLiveMsg | EndLiveMsg | CamChangeMsg;
+type OutgoingSocketMsgs =
+	| HistAddMsg
+	| HistDelMsg
+	| HistEditMsg
+	| AnnAddMsg
+	| AnnDelMsg
+	| OutboundJoinLiveMsg
+	| OutboundLeaveLiveMsg
+	| OutboundStartLiveMsg
+	| CamChangeMsg
+	| EndLiveMsg;
+
 interface SaveFilesResponse {
 	structure: string;
 	epiData: string;
@@ -19,6 +32,8 @@ interface ModelFile {
 	modelData: ModelData;
 	sortHist: Sort[];
 	annotations: RawAnnotation[];
+	live: boolean;
+	session: null | LiveSessionData;
 }
 
 interface Sort {
@@ -115,4 +130,101 @@ interface ViewRegion {
 interface RawAnnotation {
 	mesh: string;
 	text: string;
+}
+
+interface AssignedId {
+	id: string;
+	roomId: string;
+	expiration: NodeJS.Timeout;
+}
+
+interface SocketMsg {
+	type: string;
+}
+
+interface LinkMsg extends SocketMsg {
+	type: 'LINK';
+	id: string;
+	roomId: string;
+}
+
+interface HistAddMsg extends SocketMsg {
+	type: 'HIST_ADD';
+	newSort: Sort;
+}
+
+interface HistDelMsg extends SocketMsg {
+	type: 'HIST_DEL';
+	id: string;
+}
+
+interface HistEditMsg extends SocketMsg {
+	type: 'HIST_EDIT';
+	id: string;
+	name: string;
+}
+
+interface HistDelMsg extends SocketMsg {
+	type: 'HIST_DEL';
+	id: string;
+}
+
+interface AnnAddMsg extends SocketMsg {
+	type: 'ANN_ADD';
+	newAnnotation: RawAnnotation;
+}
+
+interface AnnDelMsg extends SocketMsg {
+	type: 'ANN_DEL';
+	mesh: string;
+}
+
+interface StartLiveMsg extends SocketMsg {
+	type: 'START_LIVE';
+	camPos: RawVector3;
+	camRot: RawVector3;
+	name: string;
+}
+interface JoinLiveMsg extends SocketMsg {
+	type: 'JOIN_LIVE';
+	name: string;
+}
+interface LeaveLiveMsg extends SocketMsg {
+	type: 'LEAVE_LIVE';
+}
+interface EndLiveMsg extends SocketMsg {
+	type: 'END_LIVE';
+}
+interface CamChangeMsg extends SocketMsg {
+	type: 'CAM_CHANGE';
+	camPos: RawVector3;
+	camRot: RawVector3;
+}
+
+interface OutboundStartLiveMsg extends SocketMsg {
+	type: 'START_LIVE';
+	data: LiveSessionData;
+}
+
+interface OutboundJoinLiveMsg extends SocketMsg {
+	type: 'JOIN_LIVE';
+	id: string;
+	name: string;
+}
+
+interface OutboundLeaveLiveMsg extends SocketMsg {
+	type: 'LEAVE_LIVE';
+	id: string;
+}
+
+interface LiveParticipant {
+	id: string;
+	name: string;
+}
+
+interface LiveSessionData {
+	hostID: string;
+	camPos: RawVector3;
+	camRot: RawVector3;
+	participants: LiveParticipant[];
 }
