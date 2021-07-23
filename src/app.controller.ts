@@ -65,17 +65,21 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 
 	/** Route to get model data */
 	@Get('/models/:id')
-	async getModel(@Param('id') id: string): Promise<ModelFile & { socketId: string }> {
+	async getModel(@Param('id') id: string, @Query('nosocket') noSocket: boolean): Promise<ModelFile & { socketId: string | null }> {
 		const metadata = await this.dbService.getMetadataById(id);
 		if (!metadata) {
 			throw new NotFoundException(`Model with id ${id} does not exist`);
 		}
 
-		const socketId = randomUUID();
+		if (!noSocket) {
+			const socketId = randomUUID();
 
-		this.rtService.assignId(socketId, id);
+			this.rtService.assignId(socketId, id);
 
-		return { ...metadata, socketId };
+			return { ...metadata, socketId };
+		}
+
+		return { ...metadata, socketId: null };
 	}
 
 	@Get('/history')
@@ -265,10 +269,25 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 									const { name } = message;
 									liveSession.participants.push({ id, name });
 
-									liveSession.participants.forEach(({ id: sid }) => {
-										this.rtService.getSocket(sid)!.send(JSON.stringify({ type: 'JOIN_LIVE', id, name } as OutboundJoinLiveMsg));
-									});
+									this.rtService.broadcast(roomId, { type: 'JOIN_LIVE', id, name });
 									this.dbService.addParticipant(roomId, id, name);
+								}
+								break;
+							}
+							case 'LEAVE_LIVE': {
+								const id = this.rtService.getId(client)!;
+								const roomId = this.rtService.getRoomId(client)!;
+								const liveSession = this.rtService.getLiveSession(roomId);
+								this.logger.log(`Client with id ${id} left the live session in ${roomId}`);
+
+								if (liveSession) {
+									liveSession.participants.splice(
+										liveSession.participants.findIndex(({ id: sid }) => sid === id),
+										1
+									);
+
+									this.rtService.broadcast(roomId, { type: 'LEAVE_LIVE', id });
+									this.dbService.removeParticipant(roomId, id);
 								}
 								break;
 							}
