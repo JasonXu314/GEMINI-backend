@@ -137,6 +137,38 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 		return result;
 	}
 
+	@Get('/views')
+	async getViews(@Query('id') id: string): Promise<View[]> {
+		return this.dbService.getViews(id);
+	}
+
+	@Post('/views')
+	async pushView(@Body('view') view: View, @Body('id') id: string): Promise<View[]> {
+		const result = await this.dbService.addView(id, view);
+
+		this.rtService.broadcast(id, { type: 'VIEW_ADD', newView: view });
+
+		return result;
+	}
+
+	@Patch('/views')
+	async renameView(@Body('id') modelId: string, @Body('_id') viewId: string, @Body('name') name: string): Promise<View[]> {
+		const result = await this.dbService.renameView(modelId, viewId, name);
+
+		this.rtService.broadcast(modelId, { type: 'VIEW_EDIT', id: viewId, name });
+
+		return result;
+	}
+
+	@Delete('/views')
+	async deleteViews(@Body('id') modelId: string, @Body('_id') viewId: string): Promise<View[]> {
+		const result = await this.dbService.deleteView(modelId, viewId);
+
+		this.rtService.broadcast(modelId, { type: 'VIEW_DEL', id: viewId });
+
+		return result;
+	}
+
 	@Get('/sockets')
 	@Header('Content-Type', 'text/html')
 	getTestPage(): string {
@@ -214,6 +246,11 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 							if (id === liveSession.hostID) {
 								this.dbService.closeLive(roomId);
 							} else {
+								if (id === liveSession.controllerID) {
+									liveSession.controllerID = liveSession.hostID;
+									this.dbService.transferControl(roomId, liveSession.hostID);
+									this.rtService.broadcast(roomId, { type: 'TRANSFER_CONTROL', id: liveSession.hostID });
+								}
 								this.dbService.removeParticipant(roomId, id);
 							}
 						}
@@ -231,7 +268,8 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 									participants: [{ id, name }],
 									camPos,
 									camRot,
-									hostID: id
+									hostID: id,
+									controllerID: id
 								};
 
 								try {
@@ -249,7 +287,7 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 								const roomId = this.rtService.getRoomId(client)!;
 								const liveSession = this.rtService.getLiveSession(roomId);
 
-								if (liveSession && id === liveSession.hostID) {
+								if (liveSession && id === liveSession.controllerID) {
 									const { camPos, camRot } = message;
 									liveSession.camPos = camPos;
 									liveSession.camRot = camRot;
@@ -301,6 +339,54 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 									this.rtService.closeLiveSession(roomId);
 									this.dbService.closeLive(roomId);
 								}
+								break;
+							}
+							case 'SELECT_MESH': {
+								const id = this.rtService.getId(client)!;
+								const roomId = this.rtService.getRoomId(client)!;
+								const liveSession = this.rtService.getLiveSession(roomId);
+
+								if (liveSession && id === liveSession.controllerID) {
+									this.rtService.broadcast(roomId, { type: 'SELECT_MESH', mesh: message.mesh });
+								}
+								break;
+							}
+							case 'TRANSFER_CONTROL': {
+								const id = this.rtService.getId(client)!;
+								const roomId = this.rtService.getRoomId(client)!;
+								const liveSession = this.rtService.getLiveSession(roomId);
+
+								if (liveSession && id === liveSession.hostID) {
+									this.rtService.broadcast(roomId, { type: 'TRANSFER_CONTROL', id: message.id });
+									liveSession.controllerID = message.id;
+									this.dbService.transferControl(roomId, message.id);
+								}
+								break;
+							}
+							case 'REVERT_CONTROL': {
+								const id = this.rtService.getId(client)!;
+								const roomId = this.rtService.getRoomId(client)!;
+								const liveSession = this.rtService.getLiveSession(roomId);
+
+								if (liveSession && id === liveSession.controllerID) {
+									this.rtService.broadcast(roomId, { type: 'TRANSFER_CONTROL', id: liveSession.hostID });
+									liveSession.controllerID = liveSession.hostID;
+									this.dbService.transferControl(roomId, liveSession.hostID);
+								}
+								break;
+							}
+							case 'REQUEST_CONTROL': {
+								const id = this.rtService.getId(client)!;
+								const roomId = this.rtService.getRoomId(client)!;
+								const liveSession = this.rtService.getLiveSession(roomId);
+
+								if (liveSession && id !== liveSession.hostID && id !== liveSession.controllerID) {
+									const name = liveSession.participants.find(({ id: sid }) => sid === id)!.name;
+									this.rtService
+										.getSocket(liveSession.hostID)!
+										.send(JSON.stringify({ type: 'REQUEST_CONTROL', id, name } as OutboundRequestControlMsg));
+								}
+								break;
 							}
 						}
 					});

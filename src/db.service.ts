@@ -63,7 +63,7 @@ export class DBService {
 			epiId = uuid(),
 			grefId = uuid();
 		this.logger.log(`Saving model with name ${name} and id ${_id}`);
-		const modelFile: ModelFile = { _id, name, modelData, sortHist: [], annotations, live: false, session: null };
+		const modelFile: ModelFile = { _id, name, modelData, sortHist: [], views: [], annotations, live: false, session: null };
 		await this.saveFile(structId, `${_id}.struct`, model.structure);
 		await this.saveFile(epiId, `${_id}.epi`, model.epiData);
 		await this.saveFile(grefId, `${_id}.gref`, model.refGenes);
@@ -230,6 +230,91 @@ export class DBService {
 		return newHist;
 	}
 
+	/**
+	 * Gets the views of the given model
+	 * @param _id the id of the model
+	 * @returns the views on the model of id _id
+	 */
+	public async getViews(_id: string): Promise<View[]> {
+		const sorts = (await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id }))?.views;
+
+		if (!sorts) {
+			throw new NotFoundException(`Model with id ${_id} does not exist`);
+		}
+
+		return sorts;
+	}
+
+	/**
+	 * Appends a view onto the history of the model with id _id
+	 * @param _id the id of the model to modify
+	 * @param newView the view to add
+	 * @returns the new view history
+	 */
+	public async addView(_id: string, newView: View): Promise<View[]> {
+		const res = await this.mongoClient
+			.db('files')
+			.collection<ModelFile>('metadata')
+			.findOneAndUpdate({ _id }, { $push: { views: newView } });
+
+		if (res.ok) {
+			return [...res.value!.views, newView];
+		} else {
+			throw new InternalServerErrorException('DB Failed to update');
+		}
+	}
+
+	/**
+	 * Renames a view to the given name
+	 * @param _id the id of the model to modify
+	 * @param id the id of the view to rename
+	 * @param name the new name of the view
+	 * @returns the new views after the rename
+	 */
+	public async renameView(_id: string, id: string, name: string): Promise<View[]> {
+		const currViews = (await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id }))?.views;
+
+		if (!currViews) {
+			throw new NotFoundException(`Model with id ${_id} does not exist`);
+		}
+
+		const currSort = currViews.find((sort) => sort._id === id);
+
+		if (!currSort) {
+			throw new NotFoundException(`View with id ${id} does not exist on model with id ${_id}`);
+		}
+
+		currSort.name = name;
+
+		await this.mongoClient
+			.db('files')
+			.collection<ModelFile>('metadata')
+			.findOneAndUpdate({ _id }, { $set: { views: currViews } });
+		return currViews;
+	}
+
+	/**
+	 * Deletes a given view
+	 * @param _id the id of the model to modify
+	 * @param id the id of the view to delete
+	 * @returns the new views after the deletion
+	 */
+	public async deleteView(_id: string, id: string): Promise<View[]> {
+		const currViews = (await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id }))?.views;
+
+		if (!currViews) {
+			throw new NotFoundException(`Model with id ${_id} does not exist`);
+		}
+
+		const newViews = currViews.filter((sort) => sort._id !== id);
+
+		await this.mongoClient
+			.db('files')
+			.collection<ModelFile>('metadata')
+			.findOneAndUpdate({ _id }, { $set: { views: newViews } });
+		return newViews;
+	}
+
 	public async getAnnotations(_id: string): Promise<RawAnnotation[]> {
 		const annotations = (await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id }))?.annotations;
 
@@ -340,6 +425,22 @@ export class DBService {
 		}
 
 		model.session.participants = model.session.participants.filter((p) => p.id !== id);
+
+		await this.mongoClient.db('files').collection<ModelFile>('metadata').findOneAndReplace({ _id }, model);
+	}
+
+	public async transferControl(_id: string, id: string): Promise<void> {
+		const model = await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id });
+
+		if (!model) {
+			throw new NotFoundException(`Model with id ${_id} does not exist`);
+		}
+
+		if (!model.session) {
+			throw new InternalServerErrorException(`No session data for model with id ${_id}`);
+		}
+
+		model.session.controllerID = id;
 
 		await this.mongoClient.db('files').collection<ModelFile>('metadata').findOneAndReplace({ _id }, model);
 	}

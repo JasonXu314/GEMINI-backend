@@ -1,6 +1,16 @@
 type Readable = import('stream').Readable;
 
-type IncomingSocketMsgs = LinkMsg | StartLiveMsg | JoinLiveMsg | LeaveLiveMsg | EndLiveMsg | CamChangeMsg;
+type IncomingSocketMsgs =
+	| LinkMsg
+	| StartLiveMsg
+	| JoinLiveMsg
+	| LeaveLiveMsg
+	| EndLiveMsg
+	| CamChangeMsg
+	| MeshSelectMsg
+	| TransferControlMsg
+	| RevertControlMsg
+	| RequestControlMsg;
 type OutgoingSocketMsgs =
 	| HistAddMsg
 	| HistDelMsg
@@ -11,7 +21,14 @@ type OutgoingSocketMsgs =
 	| OutboundLeaveLiveMsg
 	| OutboundStartLiveMsg
 	| CamChangeMsg
-	| EndLiveMsg;
+	| EndLiveMsg
+	| MeshSelectMsg
+	| TransferControlMsg
+	| OutboundRequestControlMsg
+	| ViewAddMsg
+	| ViewDelMsg
+	| ViewEditMsg
+	| ViewDelMsg;
 
 interface SaveFilesResponse {
 	structure: string;
@@ -32,6 +49,7 @@ interface ModelFile {
 	modelData: ModelData;
 	sortHist: Sort[];
 	annotations: RawAnnotation[];
+	views: View[];
 	live: boolean;
 	session: null | LiveSessionData;
 }
@@ -169,6 +187,27 @@ interface HistDelMsg extends SocketMsg {
 	id: string;
 }
 
+interface ViewAddMsg extends SocketMsg {
+	type: 'VIEW_ADD';
+	newView: View;
+}
+
+interface ViewDelMsg extends SocketMsg {
+	type: 'VIEW_DEL';
+	id: string;
+}
+
+interface ViewEditMsg extends SocketMsg {
+	type: 'VIEW_EDIT';
+	id: string;
+	name: string;
+}
+
+interface ViewDelMsg extends SocketMsg {
+	type: 'VIEW_DEL';
+	id: string;
+}
+
 interface AnnAddMsg extends SocketMsg {
 	type: 'ANN_ADD';
 	newAnnotation: RawAnnotation;
@@ -201,6 +240,31 @@ interface CamChangeMsg extends SocketMsg {
 	camRot: RawVector3;
 }
 
+interface MeshSelectMsg extends SocketMsg {
+	type: 'SELECT_MESH';
+	mesh: string;
+}
+
+interface TransferControlMsg extends SocketMsg {
+	type: 'TRANSFER_CONTROL';
+	id: string;
+}
+
+interface RevertControlMsg extends SocketMsg {
+	type: 'REVERT_CONTROL';
+}
+
+interface RequestControlMsg extends SocketMsg {
+	type: 'REQUEST_CONTROL';
+	id: string;
+}
+
+interface OutboundRequestControlMsg extends SocketMsg {
+	type: 'REQUEST_CONTROL';
+	id: string;
+	name: string;
+}
+
 interface OutboundStartLiveMsg extends SocketMsg {
 	type: 'START_LIVE';
 	data: LiveSessionData;
@@ -224,7 +288,15 @@ interface LiveParticipant {
 
 interface LiveSessionData {
 	hostID: string;
+	controllerID: string;
 	camPos: RawVector3;
 	camRot: RawVector3;
 	participants: LiveParticipant[];
+}
+
+interface View {
+	_id: string;
+	name: string;
+	pos: RawVector3;
+	rot: RawVector3;
 }
