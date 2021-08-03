@@ -74,7 +74,7 @@ export class DBService {
 			browser.newPage().then(async (page) => {
 				this.logger.log('Loaded Page');
 				await page.goto(`${process.env.VIEW_BASE_URL}/preview/${_id}`);
-				await new Promise((resolve) => setTimeout(resolve, 5000));
+				await new Promise((resolve) => setTimeout(resolve, 10000));
 				const sc = (await page.screenshot()) as Buffer;
 				this.logger.log('Created Preview, saving...');
 
