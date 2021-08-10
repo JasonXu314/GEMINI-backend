@@ -1,4 +1,18 @@
-import { BadRequestException, Body, Controller, Delete, Get, Header, Logger, NotFoundException, Param, Patch, Post, Query, Response } from '@nestjs/common';
+import {
+	BadRequestException,
+	Body,
+	Controller,
+	Delete,
+	Get,
+	Header,
+	Logger,
+	NotFoundException,
+	Param,
+	Patch,
+	Post,
+	Query,
+	Response
+} from '@nestjs/common';
 import { OnGatewayConnection, OnGatewayInit, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { randomUUID } from 'crypto';
 import { ServerResponse } from 'http';
@@ -65,7 +79,10 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 
 	/** Route to get model data */
 	@Get('/models/:id')
-	async getModel(@Param('id') id: string, @Query('nosocket') noSocket: boolean): Promise<ModelFile & { socketId: string | null }> {
+	async getModel(
+		@Param('id') id: string,
+		@Query('nosocket') noSocket: boolean
+	): Promise<ModelFile & { socketId: string | null }> {
 		const metadata = await this.dbService.getMetadataById(id);
 		if (!metadata) {
 			throw new NotFoundException(`Model with id ${id} does not exist`);
@@ -97,7 +114,11 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 	}
 
 	@Patch('/history')
-	async renameSort(@Body('id') modelId: string, @Body('_id') sortId: string, @Body('name') name: string): Promise<Sort[]> {
+	async renameSort(
+		@Body('id') modelId: string,
+		@Body('_id') sortId: string,
+		@Body('name') name: string
+	): Promise<Sort[]> {
 		const result = await this.dbService.renameSort(modelId, sortId, name);
 
 		this.rtService.broadcast(modelId, { type: 'HIST_EDIT', id: sortId, name });
@@ -120,7 +141,10 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 	}
 
 	@Post('/annotations')
-	async makeAnnotation(@Body('id') modelId: string, @Body('annotation') annotation: RawAnnotation): Promise<RawAnnotation[]> {
+	async makeAnnotation(
+		@Body('id') modelId: string,
+		@Body('annotation') annotation: RawAnnotation
+	): Promise<RawAnnotation[]> {
 		const result = await this.dbService.addAnnotation(modelId, annotation);
 
 		this.rtService.broadcast(modelId, { type: 'ANN_ADD', newAnnotation: annotation });
@@ -129,7 +153,7 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 	}
 
 	@Delete('/annotations')
-	async delAnnotation(@Body('id') modelId: string, @Body('name') name: string): Promise<RawAnnotation[]> {
+	async deleteAnnotation(@Body('id') modelId: string, @Body('name') name: string): Promise<RawAnnotation[]> {
 		const result = await this.dbService.removeAnnotation(modelId, name);
 
 		this.rtService.broadcast(modelId, { type: 'ANN_DEL', mesh: name });
@@ -152,7 +176,11 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 	}
 
 	@Patch('/views')
-	async renameView(@Body('id') modelId: string, @Body('_id') viewId: string, @Body('name') name: string): Promise<View[]> {
+	async renameView(
+		@Body('id') modelId: string,
+		@Body('_id') viewId: string,
+		@Body('name') name: string
+	): Promise<View[]> {
 		const result = await this.dbService.renameView(modelId, viewId, name);
 
 		this.rtService.broadcast(modelId, { type: 'VIEW_EDIT', id: viewId, name });
@@ -161,10 +189,51 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 	}
 
 	@Delete('/views')
-	async deleteViews(@Body('id') modelId: string, @Body('_id') viewId: string): Promise<View[]> {
+	async deleteView(@Body('id') modelId: string, @Body('_id') viewId: string): Promise<View[]> {
 		const result = await this.dbService.deleteView(modelId, viewId);
 
 		this.rtService.broadcast(modelId, { type: 'VIEW_DEL', id: viewId });
+
+		return result;
+	}
+
+	@Get('/highlights')
+	async getHighlights(@Query('id') id: string): Promise<RawHighlight[]> {
+		return this.dbService.getHighlights(id);
+	}
+
+	@Post('/highlights')
+	async pushHighlight(@Body('highlight') highlight: RawHighlight, @Body('id') id: string): Promise<RawHighlight[]> {
+		const result = await this.dbService.addHighlight(id, highlight);
+
+		this.rtService.broadcast(id, { type: 'HIGHLIGHT_ADD', newHighlight: highlight });
+
+		return result;
+	}
+
+	@Patch('/highlights')
+	async renameHighlight(
+		@Body('id') modelId: string,
+		@Body('_id') highlightId: string,
+		@Body('name') name: string
+	): Promise<RawHighlight[]> {
+		const result = await this.dbService.renameHighlight(modelId, highlightId, name);
+
+		this.rtService.broadcast(modelId, { type: 'HIGHLIGHT_EDIT', id: highlightId, name });
+
+		return result;
+	}
+
+	@Delete('/highlights')
+	async deleteHighlight(@Body('id') modelId: string, @Body('_id') highlightId: string): Promise<RawHighlight[]> {
+		const result = await this.dbService.deleteHighlight(modelId, highlightId);
+		const annotations = await this.dbService.getAnnotations(modelId);
+
+		if (annotations.find((ann) => ann.mesh === `highlight-${highlightId}`)) {
+			await this.deleteAnnotation(modelId, `highlight-${highlightId}`);
+		}
+
+		this.rtService.broadcast(modelId, { type: 'HIGHLIGHT_DEL', id: highlightId });
 
 		return result;
 	}
@@ -232,14 +301,22 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 			if (parsedMsg.type === 'LINK') {
 				try {
 					this.rtService.joinRoom(client, parsedMsg.id, parsedMsg.roomId);
-					this.logger.log(`Client with id ${this.rtService.getId(client)} linked with room ${this.rtService.getRoomId(client)}`);
+					this.logger.log(
+						`Client with id ${this.rtService.getId(client)} linked with room ${this.rtService.getRoomId(
+							client
+						)}`
+					);
 
 					client.once('close', () => {
 						const id = this.rtService.getId(client)!;
 						const roomId = this.rtService.getRoomId(client)!;
 						const liveSession = this.rtService.getLiveSession(roomId);
 
-						this.logger.log(`Client with id ${this.rtService.getId(client)} disconnected from room ${this.rtService.getRoomId(client)}`);
+						this.logger.log(
+							`Client with id ${this.rtService.getId(
+								client
+							)} disconnected from room ${this.rtService.getRoomId(client)}`
+						);
 						this.rtService.destroy(client);
 
 						if (liveSession) {
@@ -249,7 +326,10 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 								if (id === liveSession.controllerID) {
 									liveSession.controllerID = liveSession.hostID;
 									this.dbService.transferControl(roomId, liveSession.hostID);
-									this.rtService.broadcast(roomId, { type: 'TRANSFER_CONTROL', id: liveSession.hostID });
+									this.rtService.broadcast(roomId, {
+										type: 'TRANSFER_CONTROL',
+										id: liveSession.hostID
+									});
 								}
 								this.dbService.removeParticipant(roomId, id);
 							}
@@ -369,7 +449,10 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 								const liveSession = this.rtService.getLiveSession(roomId);
 
 								if (liveSession && id === liveSession.controllerID) {
-									this.rtService.broadcast(roomId, { type: 'TRANSFER_CONTROL', id: liveSession.hostID });
+									this.rtService.broadcast(roomId, {
+										type: 'TRANSFER_CONTROL',
+										id: liveSession.hostID
+									});
 									liveSession.controllerID = liveSession.hostID;
 									this.dbService.transferControl(roomId, liveSession.hostID);
 								}
@@ -382,9 +465,13 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 
 								if (liveSession && id !== liveSession.hostID && id !== liveSession.controllerID) {
 									const name = liveSession.participants.find(({ id: sid }) => sid === id)!.name;
-									this.rtService
-										.getSocket(liveSession.hostID)!
-										.send(JSON.stringify({ type: 'REQUEST_CONTROL', id, name } as OutboundRequestControlMsg));
+									this.rtService.getSocket(liveSession.hostID)!.send(
+										JSON.stringify({
+											type: 'REQUEST_CONTROL',
+											id,
+											name
+										} as OutboundRequestControlMsg)
+									);
 								}
 								break;
 							}

@@ -28,7 +28,11 @@ type OutgoingSocketMsgs =
 	| ViewAddMsg
 	| ViewDelMsg
 	| ViewEditMsg
-	| ViewDelMsg;
+	| ViewDelMsg
+	| HighlightAddMsg
+	| HighlightEditMsg
+	| HighlightDelMsg;
+type RawHighlight = RadiusHighlight | VolumeHighlight;
 
 interface SaveFilesResponse {
 	structure: string;
@@ -49,6 +53,7 @@ interface ModelFile {
 	modelData: ModelData;
 	sortHist: Sort[];
 	annotations: RawAnnotation[];
+	highlights: RawHighlight[];
 	views: View[];
 	live: boolean;
 	session: null | LiveSessionData;
@@ -182,8 +187,19 @@ interface HistEditMsg extends SocketMsg {
 	name: string;
 }
 
-interface HistDelMsg extends SocketMsg {
-	type: 'HIST_DEL';
+interface HighlightAddMsg extends SocketMsg {
+	type: 'HIGHLIGHT_ADD';
+	newHighlight: RawHighlight;
+}
+
+interface HighlightEditMsg extends SocketMsg {
+	type: 'HIGHLIGHT_EDIT';
+	id: string;
+	name: string;
+}
+
+interface HighlightDelMsg extends SocketMsg {
+	type: 'HIGHLIGHT_DEL';
 	id: string;
 }
 
@@ -299,4 +315,20 @@ interface View {
 	name: string;
 	pos: RawVector3;
 	rot: RawVector3;
+}
+
+interface RadiusHighlight {
+	id: string;
+	name: string;
+	params: RadSelectParams;
+	type: 'radius';
+	annotation: string | null;
+}
+
+interface VolumeHighlight {
+	id: string;
+	name: string;
+	params: VolSelectParams;
+	type: 'volume';
+	annotation: string | null;
 }

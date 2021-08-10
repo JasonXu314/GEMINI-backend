@@ -57,13 +57,28 @@ export class DBService {
 	 * @param modelData other model metadata to consider
 	 * @returns the response to the client
 	 */
-	public async saveModel(name: string, model: Model, modelData: ModelData, annotations: RawAnnotation[]): Promise<SaveFilesResponse> {
+	public async saveModel(
+		name: string,
+		model: Model,
+		modelData: ModelData,
+		annotations: RawAnnotation[]
+	): Promise<SaveFilesResponse> {
 		const _id = uuid(),
 			structId = uuid(),
 			epiId = uuid(),
 			grefId = uuid();
 		this.logger.log(`Saving model with name ${name} and id ${_id}`);
-		const modelFile: ModelFile = { _id, name, modelData, sortHist: [], views: [], annotations, live: false, session: null };
+		const modelFile: ModelFile = {
+			_id,
+			name,
+			modelData,
+			sortHist: [],
+			views: [],
+			annotations,
+			highlights: [],
+			live: false,
+			session: null
+		};
 		await this.saveFile(structId, `${_id}.struct`, model.structure);
 		await this.saveFile(epiId, `${_id}.epi`, model.epiData);
 		await this.saveFile(grefId, `${_id}.gref`, model.refGenes);
@@ -187,7 +202,8 @@ export class DBService {
 	 * @returns the new sorts after the rename
 	 */
 	public async renameSort(_id: string, id: string, name: string): Promise<Sort[]> {
-		const currHist = (await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id }))?.sortHist;
+		const currHist = (await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id }))
+			?.sortHist;
 
 		if (!currHist) {
 			throw new NotFoundException(`Model with id ${_id} does not exist`);
@@ -215,7 +231,8 @@ export class DBService {
 	 * @returns the new sorts after the deletion
 	 */
 	public async deleteSort(_id: string, id: string): Promise<Sort[]> {
-		const currHist = (await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id }))?.sortHist;
+		const currHist = (await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id }))
+			?.sortHist;
 
 		if (!currHist) {
 			throw new NotFoundException(`Model with id ${_id} does not exist`);
@@ -236,13 +253,13 @@ export class DBService {
 	 * @returns the views on the model of id _id
 	 */
 	public async getViews(_id: string): Promise<View[]> {
-		const sorts = (await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id }))?.views;
+		const views = (await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id }))?.views;
 
-		if (!sorts) {
+		if (!views) {
 			throw new NotFoundException(`Model with id ${_id} does not exist`);
 		}
 
-		return sorts;
+		return views;
 	}
 
 	/**
@@ -278,13 +295,13 @@ export class DBService {
 			throw new NotFoundException(`Model with id ${_id} does not exist`);
 		}
 
-		const currSort = currViews.find((sort) => sort._id === id);
+		const currView = currViews.find((view) => view._id === id);
 
-		if (!currSort) {
+		if (!currView) {
 			throw new NotFoundException(`View with id ${id} does not exist on model with id ${_id}`);
 		}
 
-		currSort.name = name;
+		currView.name = name;
 
 		await this.mongoClient
 			.db('files')
@@ -316,7 +333,8 @@ export class DBService {
 	}
 
 	public async getAnnotations(_id: string): Promise<RawAnnotation[]> {
-		const annotations = (await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id }))?.annotations;
+		const annotations = (await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id }))
+			?.annotations;
 
 		if (!annotations) {
 			throw new NotFoundException(`Model with id ${_id} does not exist`);
@@ -338,20 +356,109 @@ export class DBService {
 		}
 	}
 
-	public async removeAnnotation(_id: string, name: string): Promise<RawAnnotation[]> {
-		const currAnns = (await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id }))?.annotations;
+	public async removeAnnotation(_id: string, meshName: string): Promise<RawAnnotation[]> {
+		const currAnns = (await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id }))
+			?.annotations;
 
 		if (!currAnns) {
 			throw new NotFoundException(`Model with id ${_id} does not exist`);
 		}
 
-		const newAnns = currAnns.filter((ann) => ann.mesh !== name);
+		const newAnns = currAnns.filter((ann) => ann.mesh !== meshName);
 
 		await this.mongoClient
 			.db('files')
 			.collection<ModelFile>('metadata')
 			.findOneAndUpdate({ _id }, { $set: { annotations: newAnns } });
 		return newAnns;
+	}
+
+	/**
+	 * Gets the highlights of the given model
+	 * @param _id the id of the model
+	 * @returns the views on the model of id _id
+	 */
+	public async getHighlights(_id: string): Promise<RawHighlight[]> {
+		const highlights = (await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id }))
+			?.highlights;
+
+		if (!highlights) {
+			throw new NotFoundException(`Model with id ${_id} does not exist`);
+		}
+
+		return highlights;
+	}
+
+	/**
+	 * Adds a highlight to the model with id _id
+	 * @param _id the id of the model to modify
+	 * @param newHighlight the highlight to add
+	 * @returns the new view history
+	 */
+	public async addHighlight(_id: string, newHighlight: RawHighlight): Promise<RawHighlight[]> {
+		const res = await this.mongoClient
+			.db('files')
+			.collection<ModelFile>('metadata')
+			.findOneAndUpdate({ _id }, { $push: { highlights: newHighlight } });
+
+		if (res.ok) {
+			return [...res.value!.highlights, newHighlight];
+		} else {
+			throw new InternalServerErrorException('DB Failed to update');
+		}
+	}
+
+	/**
+	 * Renames a highlight to the given name
+	 * @param _id the id of the model to modify
+	 * @param id the id of the highlight to rename
+	 * @param name the new name of the view
+	 * @returns the new highlights after the rename
+	 */
+	public async renameHighlight(_id: string, id: string, name: string): Promise<RawHighlight[]> {
+		const currHighlights = (await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id }))
+			?.highlights;
+
+		if (!currHighlights) {
+			throw new NotFoundException(`Model with id ${_id} does not exist`);
+		}
+
+		const currHighlight = currHighlights.find((highlight) => highlight.id === id);
+
+		if (!currHighlight) {
+			throw new NotFoundException(`View with id ${id} does not exist on model with id ${_id}`);
+		}
+
+		currHighlight.name = name;
+
+		await this.mongoClient
+			.db('files')
+			.collection<ModelFile>('metadata')
+			.findOneAndUpdate({ _id }, { $set: { highlights: currHighlights } });
+		return currHighlights;
+	}
+
+	/**
+	 * Deletes a given highlight
+	 * @param _id the id of the model to modify
+	 * @param id the id of the highlight to delete
+	 * @returns the new highlights after the deletion
+	 */
+	public async deleteHighlight(_id: string, id: string): Promise<RawHighlight[]> {
+		const currHighlights = (await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id }))
+			?.highlights;
+
+		if (!currHighlights) {
+			throw new NotFoundException(`Model with id ${_id} does not exist`);
+		}
+
+		const newHighlights = currHighlights.filter((sort) => sort.id !== id);
+
+		await this.mongoClient
+			.db('files')
+			.collection<ModelFile>('metadata')
+			.findOneAndUpdate({ _id }, { $set: { highlights: newHighlights } });
+		return newHighlights;
 	}
 
 	public async makeLive(_id: string, data: LiveSessionData): Promise<void> {
