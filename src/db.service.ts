@@ -61,7 +61,8 @@ export class DBService {
 		name: string,
 		model: Model,
 		modelData: ModelData,
-		annotations: RawAnnotation[]
+		annotations: RawAnnotation[],
+		highlights: RawHighlight[]
 	): Promise<SaveFilesResponse> {
 		const _id = uuid(),
 			structId = uuid(),
@@ -75,7 +76,7 @@ export class DBService {
 			sortHist: [],
 			views: [],
 			annotations,
-			highlights: [],
+			highlights,
 			live: false,
 			session: null
 		};

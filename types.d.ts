@@ -10,7 +10,13 @@ type IncomingSocketMsgs =
 	| MeshSelectMsg
 	| TransferControlMsg
 	| RevertControlMsg
-	| RequestControlMsg;
+	| RequestControlMsg
+	| RadiusSelectStartMsg
+	| RadiusParamChangeMsg
+	| RadiusSetMsg
+	| RadiusResetMsg
+	| ExecuteSelectorsMsg
+	| ClearSelectorsMsg;
 type OutgoingSocketMsgs =
 	| HistAddMsg
 	| HistDelMsg
@@ -31,8 +37,16 @@ type OutgoingSocketMsgs =
 	| ViewDelMsg
 	| HighlightAddMsg
 	| HighlightEditMsg
-	| HighlightDelMsg;
+	| HighlightDelMsg
+	| RadiusSelectStartMsg
+	| RadiusParamChangeMsg
+	| RadiusSetMsg
+	| RadiusResetMsg
+	| ExecuteSelectorsMsg
+	| ClearSelectorsMsg;
 type RawHighlight = RadiusHighlight | VolumeHighlight;
+
+type RecursivePartial<T> = { [K in keyof T]?: RecursivePartial<T[K]> };
 
 interface SaveFilesResponse {
 	structure: string;
@@ -295,6 +309,28 @@ interface OutboundJoinLiveMsg extends SocketMsg {
 interface OutboundLeaveLiveMsg extends SocketMsg {
 	type: 'LEAVE_LIVE';
 	id: string;
+}
+
+interface RadiusSelectStartMsg extends SocketMsg {
+	type: 'RADIUS_START';
+}
+
+type RadiusParamChangeMsg = { type: 'RADIUS_PARAM_CHANGE' } & RecursivePartial<RadSelectParams>;
+
+interface RadiusSetMsg {
+	type: 'RADIUS_SET';
+}
+
+interface RadiusResetMsg {
+	type: 'RADIUS_RESET';
+}
+
+interface ExecuteSelectorsMsg {
+	type: 'EXECUTE_SELECTORS';
+}
+
+interface ClearSelectorsMsg {
+	type: 'CLEAR_SELECTORS';
 }
 
 interface LiveParticipant {

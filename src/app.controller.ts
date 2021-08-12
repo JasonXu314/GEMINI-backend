@@ -54,6 +54,7 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 		if (!(await this.dbService.modelExists(struct.originalName))) {
 			const viewRegion = JSON.parse(body.viewRegion) as ViewRegion;
 			const annotations = JSON.parse(body.annotations) as RawAnnotation[];
+			const highlights = JSON.parse(body.highlights) as RawHighlight[];
 			const structStream = Readable.from(struct.buffer);
 			const epiDataStream = Readable.from(epiData.buffer);
 			const refGenesStream = Readable.from(refGenes.buffer);
@@ -64,7 +65,8 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 				struct.originalName,
 				{ structure: structStream, epiData: epiDataStream, refGenes: refGenesStream },
 				{ viewRegion, flagsVisible, arcsVisible },
-				annotations
+				annotations,
+				highlights
 			);
 			return res;
 		} else {
@@ -472,6 +474,21 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 											name
 										} as OutboundRequestControlMsg)
 									);
+								}
+								break;
+							}
+							case 'RADIUS_START':
+							case 'RADIUS_PARAM_CHANGE':
+							case 'RADIUS_RESET':
+							case 'RADIUS_SET':
+							case 'EXECUTE_SELECTORS':
+							case 'CLEAR_SELECTORS': {
+								const id = this.rtService.getId(client)!;
+								const roomId = this.rtService.getRoomId(client)!;
+								const liveSession = this.rtService.getLiveSession(roomId);
+
+								if (liveSession && id === liveSession.controllerID) {
+									this.rtService.broadcast(roomId, message);
 								}
 								break;
 							}
