@@ -16,7 +16,17 @@ type IncomingSocketMsgs =
 	| RadiusSetMsg
 	| RadiusResetMsg
 	| ExecuteSelectorsMsg
-	| ClearSelectorsMsg;
+	| ClearSelectorsMsg
+	| VolumeParamChangeMsg
+	| VolumeSetMsg
+	| VolumeResetMsg
+	| VolumeSelectStartMsg
+	| VolumeCancelMsg
+	| RadiusCancelMsg
+	| BPSParamChangeMsg
+	| BPSSetMsg
+	| BPSResetMsg
+	| RecallSortMsg;
 type OutgoingSocketMsgs =
 	| HistAddMsg
 	| HistDelMsg
@@ -43,7 +53,17 @@ type OutgoingSocketMsgs =
 	| RadiusSetMsg
 	| RadiusResetMsg
 	| ExecuteSelectorsMsg
-	| ClearSelectorsMsg;
+	| ClearSelectorsMsg
+	| VolumeParamChangeMsg
+	| VolumeSetMsg
+	| VolumeResetMsg
+	| VolumeSelectStartMsg
+	| VolumeCancelMsg
+	| RadiusCancelMsg
+	| BPSParamChangeMsg
+	| BPSSetMsg
+	| BPSResetMsg
+	| RecallSortMsg;
 type RawHighlight = RadiusHighlight | VolumeHighlight;
 
 type RecursivePartial<T> = { [K in keyof T]?: RecursivePartial<T[K]> };
@@ -311,11 +331,42 @@ interface OutboundLeaveLiveMsg extends SocketMsg {
 	id: string;
 }
 
+type RadiusParamChangeMsg = { type: 'RADIUS_PARAM_CHANGE' } & RecursivePartial<RadSelectParams>;
+type VolumeParamChangeMsg = { type: 'VOLUME_PARAM_CHANGE' } & RecursivePartial<VolSelectParams>;
+type BPSParamChangeMsg = { type: 'BPS_PARAM_CHANGE' } & RecursivePartial<BPSParams>;
+
 interface RadiusSelectStartMsg extends SocketMsg {
 	type: 'RADIUS_START';
 }
 
-type RadiusParamChangeMsg = { type: 'RADIUS_PARAM_CHANGE' } & RecursivePartial<RadSelectParams>;
+interface VolumeSetMsg {
+	type: 'VOLUME_SET';
+}
+
+interface VolumeResetMsg {
+	type: 'VOLUME_RESET';
+}
+
+interface VolumeCancelMsg {
+	type: 'VOLUME_CANCEL';
+}
+
+interface VolumeSelectStartMsg extends SocketMsg {
+	type: 'VOLUME_START';
+}
+
+interface BPSSetMsg {
+	type: 'BPS_SET';
+}
+
+interface BPSResetMsg {
+	type: 'BPS_RESET';
+}
+
+interface RecallSortMsg {
+	type: 'RECALL_SORT';
+	sort: Sort;
+}
 
 interface RadiusSetMsg {
 	type: 'RADIUS_SET';
@@ -323,6 +374,10 @@ interface RadiusSetMsg {
 
 interface RadiusResetMsg {
 	type: 'RADIUS_RESET';
+}
+
+interface RadiusCancelMsg {
+	type: 'RADIUS_CANCEL';
 }
 
 interface ExecuteSelectorsMsg {

@@ -450,7 +450,7 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 								const roomId = this.rtService.getRoomId(client)!;
 								const liveSession = this.rtService.getLiveSession(roomId);
 
-								if (liveSession && id === liveSession.controllerID) {
+								if (liveSession && (id === liveSession.controllerID || id === liveSession.hostID)) {
 									this.rtService.broadcast(roomId, {
 										type: 'TRANSFER_CONTROL',
 										id: liveSession.hostID
@@ -481,8 +481,18 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 							case 'RADIUS_PARAM_CHANGE':
 							case 'RADIUS_RESET':
 							case 'RADIUS_SET':
+							case 'RADIUS_CANCEL':
+							case 'VOLUME_START':
+							case 'VOLUME_PARAM_CHANGE':
+							case 'VOLUME_RESET':
+							case 'VOLUME_SET':
+							case 'VOLUME_CANCEL':
+							case 'BPS_PARAM_CHANGE':
+							case 'BPS_RESET':
+							case 'BPS_SET':
 							case 'EXECUTE_SELECTORS':
-							case 'CLEAR_SELECTORS': {
+							case 'CLEAR_SELECTORS':
+							case 'RECALL_SORT': {
 								const id = this.rtService.getId(client)!;
 								const roomId = this.rtService.getRoomId(client)!;
 								const liveSession = this.rtService.getLiveSession(roomId);
