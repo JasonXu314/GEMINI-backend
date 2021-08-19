@@ -217,13 +217,24 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 	async renameHighlight(
 		@Body('id') modelId: string,
 		@Body('_id') highlightId: string,
-		@Body('name') name: string
+		@Body('name') name?: string,
+		@Body('color') color?: RawColor3
 	): Promise<RawHighlight[]> {
-		const result = await this.dbService.renameHighlight(modelId, highlightId, name);
+		if (name) {
+			const result = await this.dbService.renameHighlight(modelId, highlightId, name);
 
-		this.rtService.broadcast(modelId, { type: 'HIGHLIGHT_EDIT', id: highlightId, name });
+			this.rtService.broadcast(modelId, { type: 'HIGHLIGHT_EDIT', id: highlightId, name });
 
-		return result;
+			return result;
+		}
+		if (color) {
+			const result = await this.dbService.recolorHighlight(modelId, highlightId, color);
+
+			this.rtService.broadcast(modelId, { type: 'HIGHLIGHT_COLOR', id: highlightId, color });
+
+			return result;
+		}
+		return this.dbService.getHighlights(modelId);
 	}
 
 	@Delete('/highlights')

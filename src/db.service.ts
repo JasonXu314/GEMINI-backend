@@ -413,7 +413,7 @@ export class DBService {
 	 * Renames a highlight to the given name
 	 * @param _id the id of the model to modify
 	 * @param id the id of the highlight to rename
-	 * @param name the new name of the view
+	 * @param name the new name of the highlight
 	 * @returns the new highlights after the rename
 	 */
 	public async renameHighlight(_id: string, id: string, name: string): Promise<RawHighlight[]> {
@@ -431,6 +431,36 @@ export class DBService {
 		}
 
 		currHighlight.name = name;
+
+		await this.mongoClient
+			.db('files')
+			.collection<ModelFile>('metadata')
+			.findOneAndUpdate({ _id }, { $set: { highlights: currHighlights } });
+		return currHighlights;
+	}
+
+	/**
+	 * Changes the color of a highlight
+	 * @param _id the id of the model to modify
+	 * @param id the id of the highlight to change
+	 * @param color the new name of the color
+	 * @returns the new highlights after the recoloring
+	 */
+	public async recolorHighlight(_id: string, id: string, color: RawColor3): Promise<RawHighlight[]> {
+		const currHighlights = (await this.mongoClient.db('files').collection<ModelFile>('metadata').findOne({ _id }))
+			?.highlights;
+
+		if (!currHighlights) {
+			throw new NotFoundException(`Model with id ${_id} does not exist`);
+		}
+
+		const currHighlight = currHighlights.find((highlight) => highlight.id === id);
+
+		if (!currHighlight) {
+			throw new NotFoundException(`View with id ${id} does not exist on model with id ${_id}`);
+		}
+
+		currHighlight.color = color;
 
 		await this.mongoClient
 			.db('files')

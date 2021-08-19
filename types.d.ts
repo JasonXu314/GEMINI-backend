@@ -47,6 +47,7 @@ type OutgoingSocketMsgs =
 	| ViewDelMsg
 	| HighlightAddMsg
 	| HighlightEditMsg
+	| HighlightColorMsg
 	| HighlightDelMsg
 	| RadiusSelectStartMsg
 	| RadiusParamChangeMsg
@@ -130,6 +131,12 @@ interface RawVector3 {
 	x: number;
 	y: number;
 	z: number;
+}
+
+interface RawColor3 {
+	r: number;
+	g: number;
+	b: number;
 }
 
 interface RawStructureCoord extends RawVector3 {
@@ -230,6 +237,12 @@ interface HighlightEditMsg extends SocketMsg {
 	type: 'HIGHLIGHT_EDIT';
 	id: string;
 	name: string;
+}
+
+interface HighlightColorMsg extends SocketMsg {
+	type: 'HIGHLIGHT_COLOR';
+	id: string;
+	color: RawColor3;
 }
 
 interface HighlightDelMsg extends SocketMsg {
@@ -413,7 +426,7 @@ interface RadiusHighlight {
 	name: string;
 	params: RadSelectParams;
 	type: 'radius';
-	annotation: string | null;
+	color: RawColor3;
 }
 
 interface VolumeHighlight {
@@ -421,5 +434,5 @@ interface VolumeHighlight {
 	name: string;
 	params: VolSelectParams;
 	type: 'volume';
-	annotation: string | null;
+	color: RawColor3;
 }
