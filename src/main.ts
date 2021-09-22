@@ -15,7 +15,7 @@ async function bootstrap() {
 	const app = await NestFactory.create(AppModule);
 
 	app.enableCors({
-		origin: ['http://localhost:3000', 'http://localhost:3001', 'https://gemini-castor.vercel.app', 'https://gemini-dpuru-debugpoint136.vercel.app'],
+		origin: ['http://localhost:3000', 'http://localhost:3001', 'https://gemini-castor.vercel.app', 'https://gemini-pollux.vercel.app'],
 		credentials: true
 	});
 	app.useWebSocketAdapter(new WsAdapter(app));
