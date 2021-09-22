@@ -1,18 +1,4 @@
-import {
-	BadRequestException,
-	Body,
-	Controller,
-	Delete,
-	Get,
-	Header,
-	Logger,
-	NotFoundException,
-	Param,
-	Patch,
-	Post,
-	Query,
-	Response
-} from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Header, Logger, NotFoundException, Param, Patch, Post, Query, Response } from '@nestjs/common';
 import { OnGatewayConnection, OnGatewayInit, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { randomUUID } from 'crypto';
 import { ServerResponse } from 'http';
@@ -37,9 +23,10 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 	constructor(private readonly dbService: DBService, private readonly rtService: RTService) {}
 
 	/** A noop route that allows the frontend to wake up the heroku app, mitigates cold-start time somewhat */
-	@Post('/wakeup')
-	wakeup() {
+	@Get('/wakeup')
+	wakeup(): string {
 		this.logger.log('Received Wakeup Call');
+		return 'Awake';
 	}
 
 	/**
@@ -81,10 +68,7 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 
 	/** Route to get model data */
 	@Get('/models/:id')
-	async getModel(
-		@Param('id') id: string,
-		@Query('nosocket') noSocket: boolean
-	): Promise<ModelFile & { socketId: string | null }> {
+	async getModel(@Param('id') id: string, @Query('nosocket') noSocket: boolean): Promise<ModelFile & { socketId: string | null }> {
 		const metadata = await this.dbService.getMetadataById(id);
 		if (!metadata) {
 			throw new NotFoundException(`Model with id ${id} does not exist`);
@@ -116,11 +100,7 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 	}
 
 	@Patch('/history')
-	async renameSort(
-		@Body('id') modelId: string,
-		@Body('_id') sortId: string,
-		@Body('name') name: string
-	): Promise<Sort[]> {
+	async renameSort(@Body('id') modelId: string, @Body('_id') sortId: string, @Body('name') name: string): Promise<Sort[]> {
 		const result = await this.dbService.renameSort(modelId, sortId, name);
 
 		this.rtService.broadcast(modelId, { type: 'HIST_EDIT', id: sortId, name });
@@ -143,10 +123,7 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 	}
 
 	@Post('/annotations')
-	async makeAnnotation(
-		@Body('id') modelId: string,
-		@Body('annotation') annotation: RawAnnotation
-	): Promise<RawAnnotation[]> {
+	async makeAnnotation(@Body('id') modelId: string, @Body('annotation') annotation: RawAnnotation): Promise<RawAnnotation[]> {
 		const result = await this.dbService.addAnnotation(modelId, annotation);
 
 		this.rtService.broadcast(modelId, { type: 'ANN_ADD', newAnnotation: annotation });
@@ -178,11 +155,7 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 	}
 
 	@Patch('/views')
-	async renameView(
-		@Body('id') modelId: string,
-		@Body('_id') viewId: string,
-		@Body('name') name: string
-	): Promise<View[]> {
+	async renameView(@Body('id') modelId: string, @Body('_id') viewId: string, @Body('name') name: string): Promise<View[]> {
 		const result = await this.dbService.renameView(modelId, viewId, name);
 
 		this.rtService.broadcast(modelId, { type: 'VIEW_EDIT', id: viewId, name });
@@ -314,22 +287,14 @@ export class AppController implements OnGatewayInit, OnGatewayConnection {
 			if (parsedMsg.type === 'LINK') {
 				try {
 					this.rtService.joinRoom(client, parsedMsg.id, parsedMsg.roomId);
-					this.logger.log(
-						`Client with id ${this.rtService.getId(client)} linked with room ${this.rtService.getRoomId(
-							client
-						)}`
-					);
+					this.logger.log(`Client with id ${this.rtService.getId(client)} linked with room ${this.rtService.getRoomId(client)}`);
 
 					client.once('close', () => {
 						const id = this.rtService.getId(client)!;
 						const roomId = this.rtService.getRoomId(client)!;
 						const liveSession = this.rtService.getLiveSession(roomId);
 
-						this.logger.log(
-							`Client with id ${this.rtService.getId(
-								client
-							)} disconnected from room ${this.rtService.getRoomId(client)}`
-						);
+						this.logger.log(`Client with id ${this.rtService.getId(client)} disconnected from room ${this.rtService.getRoomId(client)}`);
 						this.rtService.destroy(client);
 
 						if (liveSession) {
